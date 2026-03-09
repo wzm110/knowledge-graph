@@ -1,0 +1,2279 @@
+﻿﻿title,text,lecture_link,ppt_link,code_link,video_link,chapter
+参数管理,"# 参数管理
+
+在选择了架构并设置了超参数后，我们就进入了训练阶段。
+此时，我们的目标是找到使损失函数最小化的模型参数值。
+经过训练后，我们将需要使用这些参数来做出未来的预测。
+此外，有时我们希望提取参数，以便在其他环境中复用它们，
+将模型保存下来，以便它可以在其他软件中执行，
+或者为了获得科学的理解而进行检查。
+
+之前的介绍中，我们只依靠深度学习框架来完成训练的工作，
+而忽略了操作参数的具体细节。
+本节，我们将介绍以下内容：
+
+* 访问参数，用于调试、诊断和可视化；
+* 参数初始化；
+* 在不同模型组件间共享参数。
+
+(**我们首先看一下具有单隐藏层的多层感知机。**)
+
+```{.python .input}
+from mxnet import init, np, npx
+from mxnet.gluon import nn
+npx.set_np()
+
+net = nn.Sequential()
+net.add(nn.Dense(8, activation='relu'))
+net.add(nn.Dense(1))
+net.initialize()  # 使用默认初始化方法
+
+X = np.random.uniform(size=(2, 4))
+net(X)  # 正向传播
+```
+
+```{.python .input}
+#@tab pytorch
+import torch
+from torch import nn
+
+net = nn.Sequential(nn.Linear(4, 8), nn.ReLU(), nn.Linear(8, 1))
+X = torch.rand(size=(2, 4))
+net(X)
+```
+
+```{.python .input}
+#@tab tensorflow
+import tensorflow as tf
+
+net = tf.keras.models.Sequential([
+    tf.keras.layers.Flatten(),
+    tf.keras.layers.Dense(4, activation=tf.nn.relu),
+    tf.keras.layers.Dense(1),
+])
+
+X = tf.random.uniform((2, 4))
+net(X)
+```
+
+```{.python .input}
+#@tab paddle
+import warnings
+warnings.filterwarnings(action='ignore')
+import paddle
+from paddle import nn
+
+net = nn.Sequential(nn.Linear(4, 8), nn.ReLU(), nn.Linear(8, 1))
+X = paddle.rand([2, 4])
+net(X)
+```
+
+## [**参数访问**]
+
+我们从已有模型中访问参数。
+当通过`Sequential`类定义模型时，
+我们可以通过索引来访问模型的任意层。
+这就像模型是一个列表一样，每层的参数都在其属性中。
+如下所示，我们可以检查第二个全连接层的参数。
+
+```{.python .input}
+print(net[1].params)
+```
+
+```{.python .input}
+#@tab pytorch, paddle
+print(net[2].state_dict())
+```
+
+```{.python .input}
+#@tab tensorflow
+print(net.layers[2].weights)
+```
+
+输出的结果告诉我们一些重要的事情：
+首先，这个全连接层包含两个参数，分别是该层的权重和偏置。
+两者都存储为单精度浮点数（float32）。
+注意，参数名称允许唯一标识每个参数，即使在包含数百个层的网络中也是如此。
+
+### [**目标参数**]
+
+注意，每个参数都表示为参数类的一个实例。
+要对参数执行任何操作，首先我们需要访问底层的数值。
+有几种方法可以做到这一点。有些比较简单，而另一些则比较通用。
+下面的代码从第二个全连接层（即第三个神经网络层）提取偏置，
+提取后返回的是一个参数类实例，并进一步访问该参数的值。
+
+```{.python .input}
+print(type(net[1].bias))
+print(net[1].bias)
+print(net[1].bias.data())
+```
+
+```{.python .input}
+#@tab pytorch
+print(type(net[2].bias))
+print(net[2].bias)
+print(net[2].bias.data)
+```
+
+```{.python .input}
+#@tab tensorflow
+print(type(net.layers[2].weights[1]))
+print(net.layers[2].weights[1])
+print(tf.convert_to_tensor(net.layers[2].weights[1]))
+```
+
+```{.python .input}
+#@tab paddle
+print(type(net[2].bias))
+print(net[2].bias)
+print(net[2].bias.value)
+```
+
+:begin_tab:`mxnet,pytorch,paddle`
+参数是复合的对象，包含值、梯度和额外信息。
+这就是我们需要显式参数值的原因。
+除了值之外，我们还可以访问每个参数的梯度。
+在上面这个网络中，由于我们还没有调用反向传播，所以参数的梯度处于初始状态。
+:end_tab:
+
+```{.python .input}
+net[1].weight.grad()
+```
+
+```{.python .input}
+#@tab pytorch, paddle
+net[2].weight.grad == None
+```
+
+### [**一次性访问所有参数**]
+
+当我们需要对所有参数执行操作时，逐个访问它们可能会很麻烦。
+当我们处理更复杂的块（例如，嵌套块）时，情况可能会变得特别复杂，
+因为我们需要递归整个树来提取每个子块的参数。
+下面，我们将通过演示来比较访问第一个全连接层的参数和访问所有层。
+
+```{.python .input}
+print(net[0].collect_params())
+print(net.collect_params())
+```
+
+```{.python .input}
+#@tab pytorch, paddle
+print(*[(name, param.shape) for name, param in net[0].named_parameters()])
+print(*[(name, param.shape) for name, param in net.named_parameters()])
+```
+
+```{.python .input}
+#@tab tensorflow
+print(net.layers[1].weights)
+print(net.get_weights())
+```
+
+这为我们提供了另一种访问网络参数的方式，如下所示。
+
+```{.python .input}
+net.collect_params()['dense1_bias'].data()
+```
+
+```{.python .input}
+#@tab pytorch
+net.state_dict()['2.bias'].data
+```
+
+```{.python .input}
+#@tab tensorflow
+net.get_weights()[1]
+```
+
+```{.python .input}
+#@tab paddle
+net.state_dict()['2.bias']
+```
+
+### [**从嵌套块收集参数**]
+
+让我们看看，如果我们将多个块相互嵌套，参数命名约定是如何工作的。
+我们首先定义一个生成块的函数（可以说是“块工厂”），然后将这些块组合到更大的块中。
+
+```{.python .input}
+def block1():
+    net = nn.Sequential()
+    net.add(nn.Dense(32, activation='relu'))
+    net.add(nn.Dense(16, activation='relu'))
+    return net
+
+def block2():
+    net = nn.Sequential()
+    for _ in range(4):
+        # 在这里嵌套
+        net.add(block1())
+    return net
+
+rgnet = nn.Sequential()
+rgnet.add(block2())
+rgnet.add(nn.Dense(10))
+rgnet.initialize()
+rgnet(X)
+```
+
+```{.python .input}
+#@tab pytorch
+def block1():
+    return nn.Sequential(nn.Linear(4, 8), nn.ReLU(),
+                         nn.Linear(8, 4), nn.ReLU())
+
+def block2():
+    net = nn.Sequential()
+    for i in range(4):
+        # 在这里嵌套
+        net.add_module(f'block {i}', block1())
+    return net
+
+rgnet = nn.Sequential(block2(), nn.Linear(4, 1))
+rgnet(X)
+```
+
+```{.python .input}
+#@tab tensorflow
+def block1(name):
+    return tf.keras.Sequential([
+        tf.keras.layers.Flatten(),
+        tf.keras.layers.Dense(4, activation=tf.nn.relu)],
+        name=name)
+
+def block2():
+    net = tf.keras.Sequential()
+    for i in range(4):
+        # 在这里嵌套
+        net.add(block1(name=f'block-{i}'))
+    return net
+
+rgnet = tf.keras.Sequential()
+rgnet.add(block2())
+rgnet.add(tf.keras.layers.Dense(1))
+rgnet(X)
+```
+
+```{.python .input}
+#@tab paddle
+def block1():
+    return nn.Sequential(nn.Linear(4, 8), nn.ReLU(), 
+                         nn.Linear(8, 4), nn.ReLU())
+
+def block2():
+    net = nn.Sequential()
+    for i in range(4):
+        # 在这里嵌套
+        net.add_sublayer(f'block {i}', block1())
+    return net
+
+rgnet = nn.Sequential(block2(), nn.Linear(4, 1))
+rgnet(X)
+```
+
+[**设计了网络后，我们看看它是如何工作的。**]
+
+```{.python .input}
+print(rgnet.collect_params)
+print(rgnet.collect_params())
+```
+
+```{.python .input}
+#@tab pytorch, paddle
+print(rgnet)
+```
+
+```{.python .input}
+#@tab tensorflow
+print(rgnet.summary())
+```
+
+因为层是分层嵌套的，所以我们也可以像通过嵌套列表索引一样访问它们。
+下面，我们访问第一个主要的块中、第二个子块的第一层的偏置项。
+
+```{.python .input}
+rgnet[0][1][0].bias.data()
+```
+
+```{.python .input}
+#@tab pytorch
+rgnet[0][1][0].bias.data
+```
+
+```{.python .input}
+#@tab tensorflow
+rgnet.layers[0].layers[1].layers[1].weights[1]
+```
+
+```{.python .input}
+#@tab paddle
+print(rgnet[0].state_dict()['block 0.0.bias'])
+```
+
+## 参数初始化
+
+知道了如何访问参数后，现在我们看看如何正确地初始化参数。
+我们在 :numref:`sec_numerical_stability`中讨论了良好初始化的必要性。
+深度学习框架提供默认随机初始化，
+也允许我们创建自定义初始化方法，
+满足我们通过其他规则实现初始化权重。
+
+:begin_tab:`mxnet`
+默认情况下，MXNet通过初始化权重参数的方法是
+从均匀分布$U(-0.07, 0.07)$中随机采样权重，并将偏置参数设置为0。
+MXNet的`init`模块提供了多种预置初始化方法。
+:end_tab:
+
+:begin_tab:`pytorch`
+默认情况下，PyTorch会根据一个范围均匀地初始化权重和偏置矩阵，
+这个范围是根据输入和输出维度计算出的。
+PyTorch的`nn.init`模块提供了多种预置初始化方法。
+:end_tab:
+
+:begin_tab:`tensorflow`
+默认情况下，Keras会根据一个范围均匀地初始化权重矩阵，
+这个范围是根据输入和输出维度计算出的。
+偏置参数设置为0。
+TensorFlow在根模块和`keras.initializers`模块中提供了各种初始化方法。
+:end_tab:
+
+:begin_tab:`paddle`
+默认情况下，PaddlePaddle会使用Xavier初始化权重矩阵，
+偏置参数设置为0。
+PaddlePaddle的`nn.initializer`模块提供了多种预置初始化方法。
+:end_tab:
+
+### [**内置初始化**]
+
+让我们首先调用内置的初始化器。
+下面的代码将所有权重参数初始化为标准差为0.01的高斯随机变量，
+且将偏置参数设置为0。
+
+```{.python .input}
+# 这里的force_reinit确保参数会被重新初始化，不论之前是否已经被初始化
+net.initialize(init=init.Normal(sigma=0.01), force_reinit=True)
+net[0].weight.data()[0]
+```
+
+```{.python .input}
+#@tab pytorch
+def init_normal(m):
+    if type(m) == nn.Linear:
+        nn.init.normal_(m.weight, mean=0, std=0.01)
+        nn.init.zeros_(m.bias)
+net.apply(init_normal)
+net[0].weight.data[0], net[0].bias.data[0]
+```
+
+```{.python .input}
+#@tab tensorflow
+net = tf.keras.models.Sequential([
+    tf.keras.layers.Flatten(),
+    tf.keras.layers.Dense(
+        4, activation=tf.nn.relu,
+        kernel_initializer=tf.random_normal_initializer(mean=0, stddev=0.01),
+        bias_initializer=tf.zeros_initializer()),
+    tf.keras.layers.Dense(1)])
+
+net(X)
+net.weights[0], net.weights[1]
+```
+
+```{.python .input}
+#@tab paddle
+def init_normal(m):
+    if type(m) == nn.Linear:
+        paddle.nn.initializer.Normal(mean=0.0, std=0.01)
+        paddle.zeros(m.bias)    
+net.apply(init_normal)
+net[0].weight[0],net[0].state_dict()['bias']
+```
+
+我们还可以将所有参数初始化为给定的常数，比如初始化为1。
+
+```{.python .input}
+net.initialize(init=init.Constant(1), force_reinit=True)
+net[0].weight.data()[0]
+```
+
+```{.python .input}
+#@tab pytorch
+def init_constant(m):
+    if type(m) == nn.Linear:
+        nn.init.constant_(m.weight, 1)
+        nn.init.zeros_(m.bias)
+net.apply(init_constant)
+net[0].weight.data[0], net[0].bias.data[0]
+```
+
+```{.python .input}
+#@tab tensorflow
+net = tf.keras.models.Sequential([
+    tf.keras.layers.Flatten(),
+    tf.keras.layers.Dense(
+        4, activation=tf.nn.relu,
+        kernel_initializer=tf.keras.initializers.Constant(1),
+        bias_initializer=tf.zeros_initializer()),
+    tf.keras.layers.Dense(1),
+])
+
+net(X)
+net.weights[0], net.weights[1]
+```
+
+```{.python .input}
+#@tab paddle
+def init_constant(m):
+    if type(m) == nn.Linear:
+        paddle.nn.initializer.Constant(value = 1)
+        paddle.zeros(m.bias)
+net.apply(init_constant)
+net[0].weight[0],net[0].state_dict()['bias']
+```
+
+我们还可以[**对某些块应用不同的初始化方法**]。
+例如，下面我们使用Xavier初始化方法初始化第一个神经网络层，
+然后将第三个神经网络层初始化为常量值42。
+
+```{.python .input}
+net[0].weight.initialize(init=init.Xavier(), force_reinit=True)
+net[1].initialize(init=init.Constant(42), force_reinit=True)
+print(net[0].weight.data()[0])
+print(net[1].weight.data())
+```
+
+```{.python .input}
+#@tab pytorch
+def init_xavier(m):
+    if type(m) == nn.Linear:
+        nn.init.xavier_uniform_(m.weight)
+def init_42(m):
+    if type(m) == nn.Linear:
+        nn.init.constant_(m.weight, 42)
+
+net[0].apply(init_xavier)
+net[2].apply(init_42)
+print(net[0].weight.data[0])
+print(net[2].weight.data)
+```
+
+```{.python .input}
+#@tab tensorflow
+net = tf.keras.models.Sequential([
+    tf.keras.layers.Flatten(),
+    tf.keras.layers.Dense(
+        4,
+        activation=tf.nn.relu,
+        kernel_initializer=tf.keras.initializers.GlorotUniform()),
+    tf.keras.layers.Dense(
+        1, kernel_initializer=tf.keras.initializers.Constant(1)),
+])
+
+net(X)
+print(net.layers[1].weights[0])
+print(net.layers[2].weights[0])
+```
+
+```{.python .input}
+#@tab paddle
+def xavier(m):
+    if type(m) == nn.Linear:
+        paddle.nn.initializer.XavierUniform(m.weight)
+def init_42(m):
+    if type(m) == nn.Linear:
+        paddle.nn.initializer.Constant(42)
+        
+net[0].apply(xavier)
+net[2].apply(init_42)
+print(net[0].weight[0])
+print(net[2].weight)
+```
+
+### [**自定义初始化**]
+
+有时，深度学习框架没有提供我们需要的初始化方法。
+在下面的例子中，我们使用以下的分布为任意权重参数$w$定义初始化方法：
+
+$$
+\begin{aligned}
+    w \sim \begin{cases}
+        U(5, 10) & \text{ 可能性 } \frac{1}{4} \\
+            0    & \text{ 可能性 } \frac{1}{2} \\
+        U(-10, -5) & \text{ 可能性 } \frac{1}{4}
+    \end{cases}
+\end{aligned}
+$$
+
+:begin_tab:`mxnet`
+在这里，我们定义了`Initializer`类的子类。
+通常，我们只需要实现`_init_weight`函数，
+该函数接受张量参数（`data`）并为其分配所需的初始化值。
+:end_tab:
+
+:begin_tab:`pytorch`
+同样，我们实现了一个`my_init`函数来应用到`net`。
+:end_tab:
+
+:begin_tab:`tensorflow`
+在这里，我们定义了一个`Initializer`的子类，
+并实现了`__call__`函数。
+该函数返回给定形状和数据类型的所需张量。
+:end_tab:
+
+:begin_tab:`paddle`
+同样，我们实现了一个`my_init`函数来应用到`net`。
+:end_tab:
+
+```{.python .input}
+class MyInit(init.Initializer):
+    def _init_weight(self, name, data):
+        print('Init', name, data.shape)
+        data[:] = np.random.uniform(-10, 10, data.shape)
+        data *= np.abs(data) >= 5
+
+net.initialize(MyInit(), force_reinit=True)
+net[0].weight.data()[:2]
+```
+
+```{.python .input}
+#@tab pytorch
+def my_init(m):
+    if type(m) == nn.Linear:
+        print(""Init"", *[(name, param.shape)
+                        for name, param in m.named_parameters()][0])
+        nn.init.uniform_(m.weight, -10, 10)
+        m.weight.data *= m.weight.data.abs() >= 5
+
+net.apply(my_init)
+net[0].weight[:2]
+```
+
+```{.python .input}
+#@tab tensorflow
+class MyInit(tf.keras.initializers.Initializer):
+    def __call__(self, shape, dtype=None):
+        data=tf.random.uniform(shape, -10, 10, dtype=dtype)
+        factor=(tf.abs(data) >= 5)
+        factor=tf.cast(factor, tf.float32)
+        return data * factor
+
+net = tf.keras.models.Sequential([
+    tf.keras.layers.Flatten(),
+    tf.keras.layers.Dense(
+        4,
+        activation=tf.nn.relu,
+        kernel_initializer=MyInit()),
+    tf.keras.layers.Dense(1),
+])
+
+net(X)
+print(net.layers[1].weights[0])
+```
+
+```{.python .input}
+#@tab paddle
+def my_init(m):
+    if type(m) == nn.Linear:
+        print(""Init"", *[(name, param.shape) 
+                        for name, param in m.named_parameters()][0])
+        paddle.nn.initializer.XavierUniform(m.weight, -10, 10)
+        h = paddle.abs(m.weight) >= 5
+        h = paddle.to_tensor(h)
+        m = paddle.to_tensor(m.weight)
+        m *= h       
+
+net.apply(my_init)
+net[0].weight[:2]
+```
+
+注意，我们始终可以直接设置参数。
+
+```{.python .input}
+net[0].weight.data()[:] += 1
+net[0].weight.data()[0, 0] = 42
+net[0].weight.data()[0]
+```
+
+```{.python .input}
+#@tab pytorch
+net[0].weight.data[:] += 1
+net[0].weight.data[0, 0] = 42
+net[0].weight.data[0]
+```
+
+```{.python .input}
+#@tab tensorflow
+net.layers[1].weights[0][:].assign(net.layers[1].weights[0] + 1)
+net.layers[1].weights[0][0, 0].assign(42)
+net.layers[1].weights[0]
+```
+
+```{.python .input}
+#@tab paddle
+net[0].weight.set_value(net[0].weight.numpy() + 1)
+val = net[0].weight.numpy()
+val[0, 0] = 42
+net[0].weight.set_value(val)
+net[0].weight[0]
+```
+
+:begin_tab:`mxnet`
+高级用户请注意：如果要在`autograd`范围内调整参数，
+则需要使用`set_data`，以避免误导自动微分机制。
+:end_tab:
+
+## [**参数绑定**]
+
+有时我们希望在多个层间共享参数：
+我们可以定义一个稠密层，然后使用它的参数来设置另一个层的参数。
+
+```{.python .input}
+net = nn.Sequential()
+# 我们需要给共享层一个名称，以便可以引用它的参数
+shared = nn.Dense(8, activation='relu')
+net.add(nn.Dense(8, activation='relu'),
+        shared,
+        nn.Dense(8, activation='relu', params=shared.params),
+        nn.Dense(10))
+net.initialize()
+
+X = np.random.uniform(size=(2, 20))
+net(X)
+
+# 检查参数是否相同
+print(net[1].weight.data()[0] == net[2].weight.data()[0])
+net[1].weight.data()[0, 0] = 100
+# 确保它们实际上是同一个对象，而不只是有相同的值
+print(net[1].weight.data()[0] == net[2].weight.data()[0])
+```
+
+```{.python .input}
+#@tab pytorch
+# 我们需要给共享层一个名称，以便可以引用它的参数
+shared = nn.Linear(8, 8)
+net = nn.Sequential(nn.Linear(4, 8), nn.ReLU(),
+                    shared, nn.ReLU(),
+                    shared, nn.ReLU(),
+                    nn.Linear(8, 1))
+net(X)
+# 检查参数是否相同
+print(net[2].weight.data[0] == net[4].weight.data[0])
+net[2].weight.data[0, 0] = 100
+# 确保它们实际上是同一个对象，而不只是有相同的值
+print(net[2].weight.data[0] == net[4].weight.data[0])
+```
+
+```{.python .input}
+#@tab tensorflow
+# tf.keras的表现有点不同。它会自动删除重复层
+shared = tf.keras.layers.Dense(4, activation=tf.nn.relu)
+net = tf.keras.models.Sequential([
+    tf.keras.layers.Flatten(),
+    shared,
+    shared,
+    tf.keras.layers.Dense(1),
+])
+
+net(X)
+# 检查参数是否不同
+print(len(net.layers) == 3)
+```
+
+```{.python .input}
+#@tab paddle
+# 我们需要给共享层一个名称，以便可以引用它的参数。
+shared = nn.Linear(8, 8)
+net = nn.Sequential(nn.Linear(4, 8), nn.ReLU(),
+                    shared, nn.ReLU(),
+                    shared, nn.ReLU(),
+                    nn.Linear(8, 1))
+net(X)
+# 检查参数是否相同
+print(net[2].weight[0] == net[4].weight[0])
+```
+
+:begin_tab:`mxnet`
+这个例子表明第二层和第三层的参数是绑定的。
+它们不仅值相等，而且由相同的张量表示。
+因此，如果我们改变其中一个参数，另一个参数也会改变。
+这里有一个问题：当参数绑定时，梯度会发生什么情况？
+答案是由于模型参数包含梯度，
+因此在反向传播期间第二个隐藏层和第三个隐藏层的梯度会加在一起。
+:end_tab:
+
+:begin_tab:`pytorch`
+这个例子表明第三个和第五个神经网络层的参数是绑定的。
+它们不仅值相等，而且由相同的张量表示。
+因此，如果我们改变其中一个参数，另一个参数也会改变。
+这里有一个问题：当参数绑定时，梯度会发生什么情况？
+答案是由于模型参数包含梯度，因此在反向传播期间第二个隐藏层
+（即第三个神经网络层）和第三个隐藏层（即第五个神经网络层）的梯度会加在一起。
+:end_tab:
+
+## 小结
+
+* 我们有几种方法可以访问、初始化和绑定模型参数。
+* 我们可以使用自定义初始化方法。
+
+## 练习
+
+1. 使用 :numref:`sec_model_construction` 中定义的`FancyMLP`模型，访问各个层的参数。
+1. 查看初始化模块文档以了解不同的初始化方法。
+1. 构建包含共享参数层的多层感知机并对其进行训练。在训练过程中，观察模型各层的参数和梯度。
+1. 为什么共享参数是个好主意？
+
+:begin_tab:`mxnet`
+[Discussions](https://discuss.d2l.ai/t/1831)
+:end_tab:
+
+:begin_tab:`pytorch`
+[Discussions](https://discuss.d2l.ai/t/1829)
+:end_tab:
+
+:begin_tab:`tensorflow`
+[Discussions](https://discuss.d2l.ai/t/1830)
+:end_tab:
+
+:begin_tab:`paddle`
+[Discussions](https://discuss.d2l.ai/t/11778)
+:end_tab:
+
+
+",oss://edu-test-graphrag-rw/dl/lecture/参数管理.md,,oss://edu-test-graphrag-rw/dl/code/参数管理.md,oss://edu-test-graphrag-rw/dl/video/参数管理.mp4,深度学习计算
+层和块,"# 层和块
+:label:`sec_model_construction`
+
+之前首次介绍神经网络时，我们关注的是具有单一输出的线性模型。
+在这里，整个模型只有一个输出。
+注意，单个神经网络
+（1）接受一些输入；
+（2）生成相应的标量输出；
+（3）具有一组相关 *参数*（parameters），更新这些参数可以优化某目标函数。
+
+然后，当考虑具有多个输出的网络时，
+我们利用矢量化算法来描述整层神经元。
+像单个神经元一样，层（1）接受一组输入，
+（2）生成相应的输出，
+（3）由一组可调整参数描述。
+当我们使用softmax回归时，一个单层本身就是模型。
+然而，即使我们随后引入了多层感知机，我们仍然可以认为该模型保留了上面所说的基本架构。
+
+对于多层感知机而言，整个模型及其组成层都是这种架构。
+整个模型接受原始输入（特征），生成输出（预测），
+并包含一些参数（所有组成层的参数集合）。
+同样，每个单独的层接收输入（由前一层提供），
+生成输出（到下一层的输入），并且具有一组可调参数，
+这些参数根据从下一层反向传播的信号进行更新。
+
+事实证明，研究讨论“比单个层大”但“比整个模型小”的组件更有价值。
+例如，在计算机视觉中广泛流行的ResNet-152架构就有数百层，
+这些层是由*层组*（groups of layers）的重复模式组成。
+这个ResNet架构赢得了2015年ImageNet和COCO计算机视觉比赛
+的识别和检测任务 :cite:`He.Zhang.Ren.ea.2016`。
+目前ResNet架构仍然是许多视觉任务的首选架构。
+在其他的领域，如自然语言处理和语音，
+层组以各种重复模式排列的类似架构现在也是普遍存在。
+
+为了实现这些复杂的网络，我们引入了神经网络*块*的概念。
+*块*（block）可以描述单个层、由多个层组成的组件或整个模型本身。
+使用块进行抽象的一个好处是可以将一些块组合成更大的组件，
+这一过程通常是递归的，如 :numref:`fig_blocks`所示。
+通过定义代码来按需生成任意复杂度的块，
+我们可以通过简洁的代码实现复杂的神经网络。
+
+![多个层被组合成块，形成更大的模型](../img/blocks.svg)
+:label:`fig_blocks`
+
+从编程的角度来看，块由*类*（class）表示。
+它的任何子类都必须定义一个将其输入转换为输出的前向传播函数，
+并且必须存储任何必需的参数。
+注意，有些块不需要任何参数。
+最后，为了计算梯度，块必须具有反向传播函数。
+在定义我们自己的块时，由于自动微分（在 :numref:`sec_autograd` 中引入）
+提供了一些后端实现，我们只需要考虑前向传播函数和必需的参数。
+
+在构造自定义块之前，(**我们先回顾一下多层感知机**)
+（ :numref:`sec_mlp_concise` ）的代码。
+下面的代码生成一个网络，其中包含一个具有256个单元和ReLU激活函数的全连接隐藏层，
+然后是一个具有10个隐藏单元且不带激活函数的全连接输出层。
+
+```{.python .input}
+from mxnet import np, npx
+from mxnet.gluon import nn
+npx.set_np()
+
+net = nn.Sequential()
+net.add(nn.Dense(256, activation='relu'))
+net.add(nn.Dense(10))
+net.initialize()
+
+X = np.random.uniform(size=(2, 20))
+net(X)
+```
+
+```{.python .input}
+#@tab pytorch
+import torch
+from torch import nn
+from torch.nn import functional as F
+
+net = nn.Sequential(nn.Linear(20, 256), nn.ReLU(), nn.Linear(256, 10))
+
+X = torch.rand(2, 20)
+net(X)
+```
+
+```{.python .input}
+#@tab tensorflow
+import tensorflow as tf
+
+net = tf.keras.models.Sequential([
+    tf.keras.layers.Dense(256, activation=tf.nn.relu),
+    tf.keras.layers.Dense(10),
+])
+
+X = tf.random.uniform((2, 20))
+net(X)
+```
+
+```{.python .input}
+#@tab paddle
+import warnings
+warnings.filterwarnings(action='ignore')
+import paddle
+from paddle import nn
+from paddle.nn import functional as F
+
+net = nn.Sequential(nn.Linear(20, 256), nn.ReLU(), nn.Linear(256, 10))
+
+X = paddle.rand([2, 20])
+net(X)
+```
+
+:begin_tab:`mxnet`
+在这个例子中，我们通过实例化`nn.Sequential`来构建我们的模型，
+返回的对象赋给`net`变量。
+接下来，我们反复调用`net`变量的`add`函数，按照想要执行的顺序添加层。
+简而言之，`nn.Sequential`定义了一种特殊类型的`Block`，
+即在Gluon中表示块的类，它维护`Block`的有序列表。
+`add`函数方便将每个连续的`Block`添加到列表中。
+请注意，每层都是`Dense`类的一个实例，`Dense`类本身就是`Block`的子类。
+到目前为止，我们一直在通过`net(X)`调用我们的模型来获得模型的输出。
+这实际上是`net.forward(X)`的简写，
+这是通过`Block`类的`__call__`函数实现的一个Python技巧。
+前向传播（`forward`）函数非常简单：它将列表中的每个`Block`连接在一起，
+将每个`Block`的输出作为输入传递给下一层。
+
+:end_tab:
+
+:begin_tab:`pytorch`
+在这个例子中，我们通过实例化`nn.Sequential`来构建我们的模型，
+层的执行顺序是作为参数传递的。
+简而言之，(**`nn.Sequential`定义了一种特殊的`Module`**)，
+即在PyTorch中表示一个块的类，
+它维护了一个由`Module`组成的有序列表。
+注意，两个全连接层都是`Linear`类的实例，
+`Linear`类本身就是`Module`的子类。
+另外，到目前为止，我们一直在通过`net(X)`调用我们的模型来获得模型的输出。
+这实际上是`net.__call__(X)`的简写。
+这个前向传播函数非常简单：
+它将列表中的每个块连接在一起，将每个块的输出作为下一个块的输入。
+
+:end_tab:
+
+:begin_tab:`tensorflow`
+在这个例子中，我们通过实例化`keras.models.Sequential`来构建我们的模型，
+层的执行顺序是作为参数传递的。
+简而言之，`Sequential`定义了一种特殊的`keras.Model`，
+即在Keras中表示一个块的类。
+它维护了一个由`Model`组成的有序列表，
+注意两个全连接层都是`Model`类的实例，
+这个类本身就是`Model`的子类。
+前向传播（`call`）函数也非常简单：
+它将列表中的每个块连接在一起，将每个块的输出作为下一个块的输入。
+注意，到目前为止，我们一直在通过`net(X)`调用我们的模型来获得模型的输出。
+这实际上是`net.call(X)`的简写，
+这是通过Block类的`__call__`函数实现的一个Python技巧。
+:end_tab:
+
+:begin_tab:`paddle`
+在这个例子中，我们通过实例化`nn.Sequential`来构建我们的模型，
+层的执行顺序是作为参数传递的。
+简而言之，(**`nn.Sequential`定义了一种特殊的`Layer`**)，
+即在PaddlePaddle中表示一个块的类，
+它维护了一个由`Layer`组成的有序列表。
+注意，两个全连接层都是`Linear`类的实例，
+`Linear`类本身就是`Layer`的子类。
+另外，到目前为止，我们一直在通过`net(X)`调用我们的模型来获得模型的输出。
+这实际上是`net.__call__(X)`的简写。
+这个前向传播函数非常简单：
+它将列表中的每个块连接在一起，将每个块的输出作为下一个块的输入。
+:end_tab:
+
+## [**自定义块**]
+
+要想直观地了解块是如何工作的，最简单的方法就是自己实现一个。
+在实现我们自定义块之前，我们简要总结一下每个块必须提供的基本功能。
+
+:begin_tab:`mxnet, tensorflow`
+1. 将输入数据作为其前向传播函数的参数。
+1. 通过前向传播函数来生成输出。请注意，输出的形状可能与输入的形状不同。例如，我们上面模型中的第一个全连接的层接收任意维的输入，但是返回一个维度256的输出。
+1. 计算其输出关于输入的梯度，可通过其反向传播函数进行访问。通常这是自动发生的。
+1. 存储和访问前向传播计算所需的参数。
+1. 根据需要初始化模型参数。
+:end_tab:
+
+:begin_tab:`pytorch, paddle`
+1. 将输入数据作为其前向传播函数的参数。
+1. 通过前向传播函数来生成输出。请注意，输出的形状可能与输入的形状不同。例如，我们上面模型中的第一个全连接的层接收一个20维的输入，但是返回一个维度为256的输出。
+1. 计算其输出关于输入的梯度，可通过其反向传播函数进行访问。通常这是自动发生的。
+1. 存储和访问前向传播计算所需的参数。
+1. 根据需要初始化模型参数。
+:end_tab:
+
+
+在下面的代码片段中，我们从零开始编写一个块。
+它包含一个多层感知机，其具有256个隐藏单元的隐藏层和一个10维输出层。
+注意，下面的`MLP`类继承了表示块的类。
+我们的实现只需要提供我们自己的构造函数（Python中的`__init__`函数）和前向传播函数。
+
+```{.python .input}
+class MLP(nn.Block):
+    # 用模型参数声明层。这里，我们声明两个全连接的层
+    def __init__(self, **kwargs):
+        # 调用MLP的父类Block的构造函数来执行必要的初始化。
+        # 这样，在类实例化时也可以指定其他函数参数，例如模型参数params（稍后将介绍）
+        super().__init__(**kwargs)
+        self.hidden = nn.Dense(256, activation='relu')  # 隐藏层
+        self.out = nn.Dense(10)  # 输出层
+
+    # 定义模型的前向传播，即如何根据输入X返回所需的模型输出
+    def forward(self, X):
+        return self.out(self.hidden(X))
+```
+
+```{.python .input}
+#@tab pytorch
+class MLP(nn.Module):
+    # 用模型参数声明层。这里，我们声明两个全连接的层
+    def __init__(self):
+        # 调用MLP的父类Module的构造函数来执行必要的初始化。
+        # 这样，在类实例化时也可以指定其他函数参数，例如模型参数params（稍后将介绍）
+        super().__init__()
+        self.hidden = nn.Linear(20, 256)  # 隐藏层
+        self.out = nn.Linear(256, 10)  # 输出层
+
+    # 定义模型的前向传播，即如何根据输入X返回所需的模型输出
+    def forward(self, X):
+        # 注意，这里我们使用ReLU的函数版本，其在nn.functional模块中定义。
+        return self.out(F.relu(self.hidden(X)))
+```
+
+```{.python .input}
+#@tab tensorflow
+class MLP(tf.keras.Model):
+    # 用模型参数声明层。这里，我们声明两个全连接的层
+    def __init__(self):
+        # 调用MLP的父类Model的构造函数来执行必要的初始化。
+        # 这样，在类实例化时也可以指定其他函数参数，例如模型参数params（稍后将介绍）
+        super().__init__()
+        # Hiddenlayer
+        self.hidden = tf.keras.layers.Dense(units=256, activation=tf.nn.relu)
+        self.out = tf.keras.layers.Dense(units=10)  # Outputlayer
+
+    # 定义模型的前向传播，即如何根据输入X返回所需的模型输出
+    def call(self, X):
+        return self.out(self.hidden((X)))
+```
+
+```{.python .input}
+#@tab paddle
+class MLP(nn.Layer):
+    # 用模型参数声明层。这里，我们声明两个全连接的层
+    def __init__(self):
+        # 调用`MLP`的父类Layer的构造函数来执行必要的初始化。
+        # 这样，在类实例化时也可以指定其他函数参数，例如模型参数`params`（稍后将介绍）
+        super().__init__()
+        self.hidden = nn.Linear(20, 256)  # 隐藏层
+        self.out = nn.Linear(256, 10)  # 输出层
+
+    # 定义模型的正向传播，即如何根据输入`X`返回所需的模型输出
+    def forward(self, X):
+        # 注意，这里我们使用ReLU的函数版本，其在nn.functional模块中定义。
+        return self.out(F.relu(self.hidden(X)))
+```
+
+我们首先看一下前向传播函数，它以`X`作为输入，
+计算带有激活函数的隐藏表示，并输出其未规范化的输出值。
+在这个`MLP`实现中，两个层都是实例变量。
+要了解这为什么是合理的，可以想象实例化两个多层感知机（`net1`和`net2`），
+并根据不同的数据对它们进行训练。
+当然，我们希望它们学到两种不同的模型。
+
+接着我们[**实例化多层感知机的层，然后在每次调用前向传播函数时调用这些层**]。
+注意一些关键细节：
+首先，我们定制的`__init__`函数通过`super().__init__()`
+调用父类的`__init__`函数，
+省去了重复编写模版代码的痛苦。
+然后，我们实例化两个全连接层，
+分别为`self.hidden`和`self.out`。
+注意，除非我们实现一个新的运算符，
+否则我们不必担心反向传播函数或参数初始化，
+系统将自动生成这些。
+
+我们来试一下这个函数：
+
+```{.python .input}
+net = MLP()
+net.initialize()
+net(X)
+```
+
+```{.python .input}
+#@tab pytorch, paddle
+net = MLP()
+net(X)
+```
+
+```{.python .input}
+#@tab tensorflow
+net = MLP()
+net(X)
+```
+
+块的一个主要优点是它的多功能性。
+我们可以子类化块以创建层（如全连接层的类）、
+整个模型（如上面的`MLP`类）或具有中等复杂度的各种组件。
+我们在接下来的章节中充分利用了这种多功能性，
+比如在处理卷积神经网络时。
+
+## [**顺序块**]
+
+现在我们可以更仔细地看看`Sequential`类是如何工作的，
+回想一下`Sequential`的设计是为了把其他模块串起来。
+为了构建我们自己的简化的`MySequential`，
+我们只需要定义两个关键函数：
+
+1. 一种将块逐个追加到列表中的函数；
+1. 一种前向传播函数，用于将输入按追加块的顺序传递给块组成的“链条”。
+
+下面的`MySequential`类提供了与默认`Sequential`类相同的功能。
+
+```{.python .input}
+class MySequential(nn.Block):
+    def add(self, block):
+    # 这里，block是Block子类的一个实例，我们假设它有一个唯一的名称。我们把它
+    # 保存在'Block'类的成员变量_children中。block的类型是OrderedDict。
+    # 当MySequential实例调用initialize函数时，系统会自动初始化_children
+    # 的所有成员
+        self._children[block.name] = block
+
+    def forward(self, X):
+        # OrderedDict保证了按照成员添加的顺序遍历它们
+        for block in self._children.values():
+            X = block(X)
+        return X
+```
+
+```{.python .input}
+#@tab pytorch
+class MySequential(nn.Module):
+    def __init__(self, *args):
+        super().__init__()
+        for idx, module in enumerate(args):
+            # 这里，module是Module子类的一个实例。我们把它保存在'Module'类的成员
+            # 变量_modules中。_module的类型是OrderedDict
+            self._modules[str(idx)] = module
+
+    def forward(self, X):
+        # OrderedDict保证了按照成员添加的顺序遍历它们
+        for block in self._modules.values():
+            X = block(X)
+        return X
+```
+
+```{.python .input}
+#@tab tensorflow
+class MySequential(tf.keras.Model):
+    def __init__(self, *args):
+        super().__init__()
+        self.modules = []
+        for block in args:
+            # 这里，block是tf.keras.layers.Layer子类的一个实例
+            self.modules.append(block)
+
+    def call(self, X):
+        for module in self.modules:
+            X = module(X)
+        return X
+```
+
+```{.python .input}
+#@tab paddle
+class MySequential(nn.Layer):
+    def __init__(self, *layers):
+        super(MySequential, self).__init__()
+        # 如果传入的是一个tuple
+        if len(layers) > 0 and isinstance(layers[0], tuple): 
+            for name, layer in layers:
+                # add_sublayer方法会将layer添加到self._sub_layers(一个tuple)
+                self.add_sublayer(name, layer)  
+        else:
+            for idx, layer in enumerate(layers):
+                self.add_sublayer(str(idx), layer)
+
+    def forward(self, X):
+        # OrderedDict保证了按照成员添加的顺序遍历它们
+        for layer in self._sub_layers.values():
+            X = layer(X)
+        return X
+```
+
+:begin_tab:`mxnet`
+`add`函数向有序字典`_children`添加一个块。
+读者可能会好奇为什么每个Gluon中的`Block`都有一个`_children`属性？
+以及为什么我们使用它而不是自己定义一个Python列表？
+简而言之，`_children`的主要优点是：
+在块的参数初始化过程中，
+Gluon知道在`_children`字典中查找需要初始化参数的子块。
+:end_tab:
+
+:begin_tab:`pytorch`
+`__init__`函数将每个模块逐个添加到有序字典`_modules`中。
+读者可能会好奇为什么每个`Module`都有一个`_modules`属性？
+以及为什么我们使用它而不是自己定义一个Python列表？
+简而言之，`_modules`的主要优点是：
+在模块的参数初始化过程中，
+系统知道在`_modules`字典中查找需要初始化参数的子块。
+:end_tab:
+
+:begin_tab:`paddle`
+`__init__`函数将每个模块逐个添加到有序字典`_sub_layers`中。
+你可能会好奇为什么每个`Layer`都有一个`_sub_layers`属性？
+以及为什么我们使用它而不是自己定义一个Python列表？
+简而言之，`_sub_layers`的主要优点是：
+在模块的参数初始化过程中，
+系统知道在`_sub_layers`字典中查找需要初始化参数的子块。
+:end_tab:
+
+当`MySequential`的前向传播函数被调用时，
+每个添加的块都按照它们被添加的顺序执行。
+现在可以使用我们的`MySequential`类重新实现多层感知机。
+
+```{.python .input}
+net = MySequential()
+net.add(nn.Dense(256, activation='relu'))
+net.add(nn.Dense(10))
+net.initialize()
+net(X)
+```
+
+```{.python .input}
+#@tab pytorch, paddle
+net = MySequential(nn.Linear(20, 256), nn.ReLU(), nn.Linear(256, 10))
+net(X)
+```
+
+```{.python .input}
+#@tab tensorflow
+net = MySequential(
+    tf.keras.layers.Dense(units=256, activation=tf.nn.relu),
+    tf.keras.layers.Dense(10))
+net(X)
+```
+
+请注意，`MySequential`的用法与之前为`Sequential`类编写的代码相同
+（如 :numref:`sec_mlp_concise` 中所述）。
+
+## [**在前向传播函数中执行代码**]
+
+`Sequential`类使模型构造变得简单，
+允许我们组合新的架构，而不必定义自己的类。
+然而，并不是所有的架构都是简单的顺序架构。
+当需要更强的灵活性时，我们需要定义自己的块。
+例如，我们可能希望在前向传播函数中执行Python的控制流。
+此外，我们可能希望执行任意的数学运算，
+而不是简单地依赖预定义的神经网络层。
+
+到目前为止，
+我们网络中的所有操作都对网络的激活值及网络的参数起作用。
+然而，有时我们可能希望合并既不是上一层的结果也不是可更新参数的项，
+我们称之为*常数参数*（constant parameter）。
+例如，我们需要一个计算函数
+$f(\mathbf{x},\mathbf{w}) = c \cdot \mathbf{w}^\top \mathbf{x}$的层，
+其中$\mathbf{x}$是输入，
+$\mathbf{w}$是参数，
+$c$是某个在优化过程中没有更新的指定常量。
+因此我们实现了一个`FixedHiddenMLP`类，如下所示：
+
+```{.python .input}
+class FixedHiddenMLP(nn.Block):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # 使用get_constant函数创建的随机权重参数在训练期间不会更新（即为常量参数）
+        self.rand_weight = self.params.get_constant(
+            'rand_weight', np.random.uniform(size=(20, 20)))
+        self.dense = nn.Dense(20, activation='relu')
+
+    def forward(self, X):
+        X = self.dense(X)
+        # 使用创建的常量参数以及relu和dot函数
+        X = npx.relu(np.dot(X, self.rand_weight.data()) + 1)
+        # 复用全连接层。这相当于两个全连接层共享参数
+        X = self.dense(X)
+        # 控制流
+        while np.abs(X).sum() > 1:
+            X /= 2
+        return X.sum()
+```
+
+```{.python .input}
+#@tab pytorch
+class FixedHiddenMLP(nn.Module):
+    def __init__(self):
+        super().__init__()
+        # 不计算梯度的随机权重参数。因此其在训练期间保持不变
+        self.rand_weight = torch.rand((20, 20), requires_grad=False)
+        self.linear = nn.Linear(20, 20)
+
+    def forward(self, X):
+        X = self.linear(X)
+        # 使用创建的常量参数以及relu和mm函数
+        X = F.relu(torch.mm(X, self.rand_weight) + 1)
+        # 复用全连接层。这相当于两个全连接层共享参数
+        X = self.linear(X)
+        # 控制流
+        while X.abs().sum() > 1:
+            X /= 2
+        return X.sum()
+```
+
+```{.python .input}
+#@tab tensorflow
+class FixedHiddenMLP(tf.keras.Model):
+    def __init__(self):
+        super().__init__()
+        self.flatten = tf.keras.layers.Flatten()
+        # 使用tf.constant函数创建的随机权重参数在训练期间不会更新（即为常量参数）
+        self.rand_weight = tf.constant(tf.random.uniform((20, 20)))
+        self.dense = tf.keras.layers.Dense(20, activation=tf.nn.relu)
+
+    def call(self, inputs):
+        X = self.flatten(inputs)
+        # 使用创建的常量参数以及relu和matmul函数
+        X = tf.nn.relu(tf.matmul(X, self.rand_weight) + 1)
+        # 复用全连接层。这相当于两个全连接层共享参数。
+        X = self.dense(X)
+        # 控制流
+        while tf.reduce_sum(tf.math.abs(X)) > 1:
+            X /= 2
+        return tf.reduce_sum(X)
+```
+
+```{.python .input}
+#@tab paddle
+class FixedHiddenMLP(nn.Layer):
+    def __init__(self):
+        super().__init__()
+        # 不计算梯度的随机权重参数。因此其在训练期间保持不变。
+        self.rand_weight = paddle.rand([20, 20])
+        self.linear = nn.Linear(20, 20)
+
+    def forward(self, X):
+        X = self.linear(X)
+        # 使用创建的常量参数以及relu和mm函数。
+        X = F.relu(paddle.tensor.mm(X, self.rand_weight) + 1)
+        # 复用全连接层。这相当于两个全连接层共享参数。
+        X = self.linear(X)
+        # 控制流
+        while X.abs().sum() > 1:
+            X /= 2
+        return X.sum()
+```
+
+在这个`FixedHiddenMLP`模型中，我们实现了一个隐藏层，
+其权重（`self.rand_weight`）在实例化时被随机初始化，之后为常量。
+这个权重不是一个模型参数，因此它永远不会被反向传播更新。
+然后，神经网络将这个固定层的输出通过一个全连接层。
+
+注意，在返回输出之前，模型做了一些不寻常的事情：
+它运行了一个while循环，在$L_1$范数大于$1$的条件下，
+将输出向量除以$2$，直到它满足条件为止。
+最后，模型返回了`X`中所有项的和。
+注意，此操作可能不会常用于在任何实际任务中，
+我们只展示如何将任意代码集成到神经网络计算的流程中。
+
+```{.python .input}
+net = FixedHiddenMLP()
+net.initialize()
+net(X)
+```
+
+```{.python .input}
+#@tab pytorch, tensorflow, paddle
+net = FixedHiddenMLP()
+net(X)
+```
+
+我们可以[**混合搭配各种组合块的方法**]。
+在下面的例子中，我们以一些想到的方法嵌套块。
+
+```{.python .input}
+class NestMLP(nn.Block):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.net = nn.Sequential()
+        self.net.add(nn.Dense(64, activation='relu'),
+                     nn.Dense(32, activation='relu'))
+        self.dense = nn.Dense(16, activation='relu')
+
+    def forward(self, X):
+        return self.dense(self.net(X))
+
+chimera = nn.Sequential()
+chimera.add(NestMLP(), nn.Dense(20), FixedHiddenMLP())
+chimera.initialize()
+chimera(X)
+```
+
+```{.python .input}
+#@tab pytorch
+class NestMLP(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.net = nn.Sequential(nn.Linear(20, 64), nn.ReLU(),
+                                 nn.Linear(64, 32), nn.ReLU())
+        self.linear = nn.Linear(32, 16)
+
+    def forward(self, X):
+        return self.linear(self.net(X))
+
+chimera = nn.Sequential(NestMLP(), nn.Linear(16, 20), FixedHiddenMLP())
+chimera(X)
+```
+
+```{.python .input}
+#@tab tensorflow
+class NestMLP(tf.keras.Model):
+    def __init__(self):
+        super().__init__()
+        self.net = tf.keras.Sequential()
+        self.net.add(tf.keras.layers.Dense(64, activation=tf.nn.relu))
+        self.net.add(tf.keras.layers.Dense(32, activation=tf.nn.relu))
+        self.dense = tf.keras.layers.Dense(16, activation=tf.nn.relu)
+
+    def call(self, inputs):
+        return self.dense(self.net(inputs))
+
+chimera = tf.keras.Sequential()
+chimera.add(NestMLP())
+chimera.add(tf.keras.layers.Dense(20))
+chimera.add(FixedHiddenMLP())
+chimera(X)
+```
+
+```{.python .input}
+#@tab paddle
+class NestMLP(nn.Layer):
+    def __init__(self):
+        super().__init__()
+        self.net = nn.Sequential(nn.Linear(20, 64), nn.ReLU(),
+                                 nn.Linear(64, 32), nn.ReLU())
+        self.linear = nn.Linear(32, 16)
+
+    def forward(self, X):
+        return self.linear(self.net(X))
+
+chimera = nn.Sequential(NestMLP(), nn.Linear(16, 20), FixedHiddenMLP())
+chimera(X)
+```
+
+## 效率
+
+:begin_tab:`mxnet`
+读者可能会开始担心操作效率的问题。
+毕竟，我们在一个高性能的深度学习库中进行了大量的字典查找、
+代码执行和许多其他的Python代码。
+Python的问题[全局解释器锁](https://wiki.python.org/moin/GlobalInterpreterLock)
+是众所周知的。
+在深度学习环境中，我们担心速度极快的GPU可能要等到CPU运行Python代码后才能运行另一个作业。
+
+提高Python速度的最好方法是完全避免使用Python。
+Gluon这样做的一个方法是允许*混合式编程*（hybridization），这将在后面描述。
+Python解释器在第一次调用块时执行它。
+Gluon运行时记录正在发生的事情，以及下一次它将对Python调用加速。
+在某些情况下，这可以大大加快运行速度，
+但当控制流（如上所述）在不同的网络通路上引导不同的分支时，需要格外小心。
+我们建议感兴趣的读者在读完本章后，阅读混合式编程部分（ :numref:`sec_hybridize` ）来了解编译。
+:end_tab:
+
+:begin_tab:`pytorch`
+读者可能会开始担心操作效率的问题。
+毕竟，我们在一个高性能的深度学习库中进行了大量的字典查找、
+代码执行和许多其他的Python代码。
+Python的问题[全局解释器锁](https://wiki.python.org/moin/GlobalInterpreterLock)
+是众所周知的。
+在深度学习环境中，我们担心速度极快的GPU可能要等到CPU运行Python代码后才能运行另一个作业。
+:end_tab:
+
+:begin_tab:`tensorflow`
+读者可能会开始担心操作效率的问题。
+毕竟，我们在一个高性能的深度学习库中进行了大量的字典查找、
+代码执行和许多其他的Python代码。
+Python的问题[全局解释器锁](https://wiki.python.org/moin/GlobalInterpreterLock)
+是众所周知的。
+在深度学习环境中，我们担心速度极快的GPU可能要等到CPU运行Python代码后才能运行另一个作业。
+:end_tab:
+
+:begin_tab:`paddle`
+你可能会开始担心操作效率的问题。
+毕竟，我们在一个高性能的深度学习库中进行了大量的字典查找、
+代码执行和许多其他的Python代码。
+Python的问题[全局解释器锁](https://wiki.python.org/moin/GlobalInterpreterLock)
+是众所周知的。
+在深度学习环境中，我们担心速度极快的GPU可能要等到CPU运行Python代码后才能运行另一个作业。
+:end_tab:
+
+
+## 小结
+
+* 一个块可以由许多层组成；一个块可以由许多块组成。
+* 块可以包含代码。
+* 块负责大量的内部处理，包括参数初始化和反向传播。
+* 层和块的顺序连接由`Sequential`块处理。
+
+## 练习
+
+1. 如果将`MySequential`中存储块的方式更改为Python列表，会出现什么样的问题？
+1. 实现一个块，它以两个块为参数，例如`net1`和`net2`，并返回前向传播中两个网络的串联输出。这也被称为平行块。
+1. 假设我们想要连接同一网络的多个实例。实现一个函数，该函数生成同一个块的多个实例，并在此基础上构建更大的网络。
+
+:begin_tab:`mxnet`
+[Discussions](https://discuss.d2l.ai/t/1828)
+:end_tab:
+
+:begin_tab:`pytorch`
+[Discussions](https://discuss.d2l.ai/t/1827)
+:end_tab:
+
+:begin_tab:`tensorflow`
+[Discussions](https://discuss.d2l.ai/t/1826)
+:end_tab:
+
+:begin_tab:`paddle`
+[Discussions](https://discuss.d2l.ai/t/11777)
+:end_tab:
+
+
+",oss://edu-test-graphrag-rw/dl/lecture/深度学习计算\层和块.md,,oss://edu-test-graphrag-rw/dl/code/模型构造.md,oss://edu-test-graphrag-rw/dl/video/模型构造.mp4,深度学习计算
+延后初始化,"# 延后初始化
+:label:`sec_deferred_init`
+
+到目前为止，我们忽略了建立网络时需要做的以下这些事情：
+
+* 我们定义了网络架构，但没有指定输入维度。
+* 我们添加层时没有指定前一层的输出维度。
+* 我们在初始化参数时，甚至没有足够的信息来确定模型应该包含多少参数。
+
+有些读者可能会对我们的代码能运行感到惊讶。
+毕竟，深度学习框架无法判断网络的输入维度是什么。
+这里的诀窍是框架的*延后初始化*（defers initialization），
+即直到数据第一次通过模型传递时，框架才会动态地推断出每个层的大小。
+
+在以后，当使用卷积神经网络时，
+由于输入维度（即图像的分辨率）将影响每个后续层的维数，
+有了该技术将更加方便。
+现在我们在编写代码时无须知道维度是什么就可以设置参数，
+这种能力可以大大简化定义和修改模型的任务。
+接下来，我们将更深入地研究初始化机制。
+
+## 实例化网络
+
+首先，让我们实例化一个多层感知机。
+
+```{.python .input}
+from mxnet import np, npx
+from mxnet.gluon import nn
+npx.set_np()
+
+def get_net():
+    net = nn.Sequential()
+    net.add(nn.Dense(256, activation='relu'))
+    net.add(nn.Dense(10))
+    return net
+
+net = get_net()
+```
+
+```{.python .input}
+#@tab tensorflow
+import tensorflow as tf
+
+net = tf.keras.models.Sequential([
+    tf.keras.layers.Dense(256, activation=tf.nn.relu),
+    tf.keras.layers.Dense(10),
+])
+```
+
+此时，因为输入维数是未知的，所以网络不可能知道输入层权重的维数。
+因此，框架尚未初始化任何参数，我们通过尝试访问以下参数进行确认。
+
+```{.python .input}
+print(net.collect_params)
+print(net.collect_params())
+```
+
+```{.python .input}
+#@tab tensorflow
+[net.layers[i].get_weights() for i in range(len(net.layers))]
+```
+
+:begin_tab:`mxnet`
+注意，当参数对象存在时，每个层的输入维度为-1。
+MXNet使用特殊值-1表示参数维度仍然未知。
+此时，尝试访问`net[0].weight.data()`将触发运行时错误，
+提示必须先初始化网络，然后才能访问参数。
+现在让我们看看当我们试图通过`initialize`函数初始化参数时会发生什么。
+:end_tab:
+
+:begin_tab:`tensorflow`
+请注意，每个层对象都存在，但权重为空。
+使用`net.get_weights()`将抛出一个错误，因为权重尚未初始化。
+:end_tab:
+
+```{.python .input}
+net.initialize()
+net.collect_params()
+```
+
+:begin_tab:`mxnet`
+如我们所见，一切都没有改变。
+当输入维度未知时，调用`initialize`不会真正初始化参数。
+而是会在MXNet内部声明希望初始化参数，并且可以选择初始化分布。
+:end_tab:
+
+接下来让我们将数据通过网络，最终使框架初始化参数。
+
+```{.python .input}
+X = np.random.uniform(size=(2, 20))
+net(X)
+
+net.collect_params()
+```
+
+```{.python .input}
+#@tab tensorflow
+X = tf.random.uniform((2, 20))
+net(X)
+[w.shape for w in net.get_weights()]
+```
+
+一旦我们知道输入维数是20，框架可以通过代入值20来识别第一层权重矩阵的形状。
+识别出第一层的形状后，框架处理第二层，依此类推，直到所有形状都已知为止。
+注意，在这种情况下，只有第一层需要延迟初始化，但是框架仍是按顺序初始化的。
+等到知道了所有的参数形状，框架就可以初始化参数。
+
+## 小结
+
+* 延后初始化使框架能够自动推断参数形状，使修改模型架构变得容易，避免了一些常见的错误。
+* 我们可以通过模型传递数据，使框架最终初始化参数。
+
+## 练习
+
+1. 如果指定了第一层的输入尺寸，但没有指定后续层的尺寸，会发生什么？是否立即进行初始化？
+1. 如果指定了不匹配的维度会发生什么？
+1. 如果输入具有不同的维度，需要做什么？提示：查看参数绑定的相关内容。
+
+:begin_tab:`mxnet`
+[Discussions](https://discuss.d2l.ai/t/5770)
+:end_tab:
+
+:begin_tab:`pytorch`
+[Discussions](https://discuss.d2l.ai/t/5770)
+:end_tab:
+
+:begin_tab:`tensorflow`
+[Discussions](https://discuss.d2l.ai/t/1833)
+:end_tab:
+
+:begin_tab:`paddle`
+[Discussions](https://discuss.d2l.ai/t/11779)
+:end_tab:
+
+
+",,,,,深度学习计算
+深度学习计算,"# 深度学习计算
+:label:`chap_computation`
+
+除了庞大的数据集和强大的硬件，
+优秀的软件工具在深度学习的快速发展中发挥了不可或缺的作用。
+从2007年发布的开创性的Theano库开始，
+灵活的开源工具使研究人员能够快速开发模型原型，
+避免了我们使用标准组件时的重复工作，
+同时仍然保持了我们进行底层修改的能力。
+随着时间的推移，深度学习库已经演变成提供越来越粗糙的抽象。
+就像半导体设计师从指定晶体管到逻辑电路再到编写代码一样，
+神经网络研究人员已经从考虑单个人工神经元的行为转变为从层的角度构思网络，
+通常在设计架构时考虑的是更粗糙的块（block）。
+
+之前我们已经介绍了一些基本的机器学习概念，
+并慢慢介绍了功能齐全的深度学习模型。
+在上一章中，我们从零开始实现了多层感知机的每个组件，
+然后展示了如何利用高级API轻松地实现相同的模型。
+为了易于学习，我们调用了深度学习库，但是跳过了它们工作的细节。
+在本章中，我们将深入探索深度学习计算的关键组件，
+即模型构建、参数访问与初始化、设计自定义层和块、将模型读写到磁盘，
+以及利用GPU实现显著的加速。
+这些知识将使读者从深度学习“基础用户”变为“高级用户”。
+虽然本章不介绍任何新的模型或数据集，
+但后面的高级模型章节在很大程度上依赖于本章的知识。",,,,,深度学习计算
+自定义层,"# 自定义层
+
+深度学习成功背后的一个因素是神经网络的灵活性：
+我们可以用创造性的方式组合不同的层，从而设计出适用于各种任务的架构。
+例如，研究人员发明了专门用于处理图像、文本、序列数据和执行动态规划的层。
+有时我们会遇到或要自己发明一个现在在深度学习框架中还不存在的层。
+在这些情况下，必须构建自定义层。本节将展示如何构建自定义层。
+
+## 不带参数的层
+
+首先，我们(**构造一个没有任何参数的自定义层**)。
+回忆一下在 :numref:`sec_model_construction`对块的介绍，
+这应该看起来很眼熟。
+下面的`CenteredLayer`类要从其输入中减去均值。
+要构建它，我们只需继承基础层类并实现前向传播功能。
+
+```{.python .input}
+from mxnet import np, npx
+from mxnet.gluon import nn
+npx.set_np()
+
+class CenteredLayer(nn.Block):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def forward(self, X):
+        return X - X.mean()
+```
+
+```{.python .input}
+#@tab pytorch
+import torch
+from torch import nn
+import torch.nn.functional as F
+
+class CenteredLayer(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, X):
+        return X - X.mean()
+```
+
+```{.python .input}
+#@tab tensorflow
+import tensorflow as tf
+
+class CenteredLayer(tf.keras.Model):
+    def __init__(self):
+        super().__init__()
+
+    def call(self, inputs):
+        return inputs - tf.reduce_mean(inputs)
+```
+
+```{.python .input}
+#@tab paddle
+import warnings
+warnings.filterwarnings(action='ignore')
+import paddle
+from paddle import nn
+import paddle.nn.functional as F
+
+class CenteredLayer(nn.Layer):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, X):
+        return X - X.mean()
+```
+
+让我们向该层提供一些数据，验证它是否能按预期工作。
+
+```{.python .input}
+layer = CenteredLayer()
+layer(np.array([1, 2, 3, 4, 5]))
+```
+
+```{.python .input}
+#@tab pytorch
+layer = CenteredLayer()
+layer(torch.FloatTensor([1, 2, 3, 4, 5]))
+```
+
+```{.python .input}
+#@tab tensorflow
+layer = CenteredLayer()
+layer(tf.constant([1, 2, 3, 4, 5]))
+```
+
+```{.python .input}
+#@tab paddle
+layer = CenteredLayer()
+layer(paddle.to_tensor([1, 2, 3, 4, 5], dtype='float32'))
+```
+
+现在，我们可以[**将层作为组件合并到更复杂的模型中**]。
+
+```{.python .input}
+net = nn.Sequential()
+net.add(nn.Dense(128), CenteredLayer())
+net.initialize()
+```
+
+```{.python .input}
+#@tab pytorch, paddle
+net = nn.Sequential(nn.Linear(8, 128), CenteredLayer())
+```
+
+```{.python .input}
+#@tab tensorflow
+net = tf.keras.Sequential([tf.keras.layers.Dense(128), CenteredLayer()])
+```
+
+作为额外的健全性检查，我们可以在向该网络发送随机数据后，检查均值是否为0。
+由于我们处理的是浮点数，因为存储精度的原因，我们仍然可能会看到一个非常小的非零数。
+
+```{.python .input}
+Y = net(np.random.uniform(size=(4, 8)))
+Y.mean()
+```
+
+```{.python .input}
+#@tab pytorch
+Y = net(torch.rand(4, 8))
+Y.mean()
+```
+
+```{.python .input}
+#@tab tensorflow
+Y = net(tf.random.uniform((4, 8)))
+tf.reduce_mean(Y)
+```
+
+```{.python .input}
+#@tab paddle
+Y = net(paddle.rand([4, 8]))
+Y.mean()
+```
+
+## [**带参数的层**]
+
+以上我们知道了如何定义简单的层，下面我们继续定义具有参数的层，
+这些参数可以通过训练进行调整。
+我们可以使用内置函数来创建参数，这些函数提供一些基本的管理功能。
+比如管理访问、初始化、共享、保存和加载模型参数。
+这样做的好处之一是：我们不需要为每个自定义层编写自定义的序列化程序。
+
+现在，让我们实现自定义版本的全连接层。
+回想一下，该层需要两个参数，一个用于表示权重，另一个用于表示偏置项。
+在此实现中，我们使用修正线性单元作为激活函数。
+该层需要输入参数：`in_units`和`units`，分别表示输入数和输出数。
+
+```{.python .input}
+class MyDense(nn.Block):
+    def __init__(self, units, in_units, **kwargs):
+        super().__init__(**kwargs)
+        self.weight = self.params.get('weight', shape=(in_units, units))
+        self.bias = self.params.get('bias', shape=(units,))
+
+    def forward(self, x):
+        linear = np.dot(x, self.weight.data(ctx=x.ctx)) + self.bias.data(
+            ctx=x.ctx)
+        return npx.relu(linear)
+```
+
+```{.python .input}
+#@tab pytorch
+class MyLinear(nn.Module):
+    def __init__(self, in_units, units):
+        super().__init__()
+        self.weight = nn.Parameter(torch.randn(in_units, units))
+        self.bias = nn.Parameter(torch.randn(units,))
+    def forward(self, X):
+        linear = torch.matmul(X, self.weight.data) + self.bias.data
+        return F.relu(linear)
+```
+
+```{.python .input}
+#@tab tensorflow
+class MyDense(tf.keras.Model):
+    def __init__(self, units):
+        super().__init__()
+        self.units = units
+
+    def build(self, X_shape):
+        self.weight = self.add_weight(name='weight',
+            shape=[X_shape[-1], self.units],
+            initializer=tf.random_normal_initializer())
+        self.bias = self.add_weight(
+            name='bias', shape=[self.units],
+            initializer=tf.zeros_initializer())
+
+    def call(self, X):
+        linear = tf.matmul(X, self.weight) + self.bias
+        return tf.nn.relu(linear)
+```
+
+```{.python .input}
+#@tab paddle
+class MyLinear(nn.Layer):
+    def __init__(self, in_units, units):
+        super().__init__()
+        self.weight = paddle.create_parameter(shape=(in_units, units), dtype='float32')
+        self.bias = paddle.create_parameter(shape=(units,), dtype='float32')
+        
+    def forward(self, X):
+        linear = paddle.matmul(X, self.weight) + self.bias
+        return F.relu(linear)
+```
+
+:begin_tab:`mxnet, tensorflow`
+接下来，我们实例化`MyDense`类并访问其模型参数。
+:end_tab:
+
+:begin_tab:`pytorch`
+接下来，我们实例化`MyLinear`类并访问其模型参数。
+:end_tab:
+
+:begin_tab:`paddle`
+接下来，我们实例化`MyLinear`类并访问其模型参数。
+:end_tab:
+
+```{.python .input}
+dense = MyDense(units=3, in_units=5)
+dense.params
+```
+
+```{.python .input}
+#@tab pytorch, paddle
+linear = MyLinear(5, 3)
+linear.weight
+```
+
+```{.python .input}
+#@tab tensorflow
+dense = MyDense(3)
+dense(tf.random.uniform((2, 5)))
+dense.get_weights()
+```
+
+我们可以[**使用自定义层直接执行前向传播计算**]。
+
+```{.python .input}
+dense.initialize()
+dense(np.random.uniform(size=(2, 5)))
+```
+
+```{.python .input}
+#@tab pytorch
+linear(torch.rand(2, 5))
+```
+
+```{.python .input}
+#@tab tensorflow
+dense(tf.random.uniform((2, 5)))
+```
+
+```{.python .input}
+#@tab paddle
+linear(paddle.randn([2, 5]))
+```
+
+我们还可以(**使用自定义层构建模型**)，就像使用内置的全连接层一样使用自定义层。
+
+```{.python .input}
+net = nn.Sequential()
+net.add(MyDense(8, in_units=64),
+        MyDense(1, in_units=8))
+net.initialize()
+net(np.random.uniform(size=(2, 64)))
+```
+
+```{.python .input}
+#@tab pytorch
+net = nn.Sequential(MyLinear(64, 8), MyLinear(8, 1))
+net(torch.rand(2, 64))
+```
+
+```{.python .input}
+#@tab tensorflow
+net = tf.keras.models.Sequential([MyDense(8), MyDense(1)])
+net(tf.random.uniform((2, 64)))
+```
+
+```{.python .input}
+#@tab paddle
+net = nn.Sequential(MyLinear(64, 8), MyLinear(8, 1))
+net(paddle.rand([2, 64]))
+```
+
+## 小结
+
+* 我们可以通过基本层类设计自定义层。这允许我们定义灵活的新层，其行为与深度学习框架中的任何现有层不同。
+* 在自定义层定义完成后，我们就可以在任意环境和网络架构中调用该自定义层。
+* 层可以有局部参数，这些参数可以通过内置函数创建。
+
+## 练习
+
+1. 设计一个接受输入并计算张量降维的层，它返回$y_k = \sum_{i, j} W_{ijk} x_i x_j$。
+1. 设计一个返回输入数据的傅立叶系数前半部分的层。
+
+:begin_tab:`mxnet`
+[Discussions](https://discuss.d2l.ai/t/1837)
+:end_tab:
+
+:begin_tab:`pytorch`
+[Discussions](https://discuss.d2l.ai/t/1835)
+:end_tab:
+
+:begin_tab:`tensorflow`
+[Discussions](https://discuss.d2l.ai/t/1836)
+:end_tab:
+
+:begin_tab:`paddle`
+[Discussions](https://discuss.d2l.ai/t/11780)
+:end_tab:
+
+
+",oss://edu-test-graphrag-rw/dl/lecture/自定义层.md,,oss://edu-test-graphrag-rw/dl/code/自定义层.md,oss://edu-test-graphrag-rw/dl/video/自定义层.mp4,深度学习计算
+读写文件,"# 读写文件
+
+到目前为止，我们讨论了如何处理数据，
+以及如何构建、训练和测试深度学习模型。
+然而，有时我们希望保存训练的模型，
+以备将来在各种环境中使用（比如在部署中进行预测）。
+此外，当运行一个耗时较长的训练过程时，
+最佳的做法是定期保存中间结果，
+以确保在服务器电源被不小心断掉时，我们不会损失几天的计算结果。
+因此，现在是时候学习如何加载和存储权重向量和整个模型了。
+
+## (**加载和保存张量**)
+
+对于单个张量，我们可以直接调用`load`和`save`函数分别读写它们。
+这两个函数都要求我们提供一个名称，`save`要求将要保存的变量作为输入。
+
+```{.python .input}
+from mxnet import np, npx
+from mxnet.gluon import nn
+npx.set_np()
+
+x = np.arange(4)
+npx.save('x-file', x)
+```
+
+```{.python .input}
+#@tab pytorch
+import torch
+from torch import nn
+from torch.nn import functional as F
+
+x = torch.arange(4)
+torch.save(x, 'x-file')
+```
+
+```{.python .input}
+#@tab tensorflow
+import tensorflow as tf
+import numpy as np
+
+x = tf.range(4)
+np.save('x-file.npy', x)
+```
+
+```{.python .input}
+#@tab paddle
+import warnings
+warnings.filterwarnings(action='ignore')
+import paddle
+from paddle import nn 
+from paddle.nn import functional as F
+
+x = paddle.arange(4)  
+paddle.save(x, 'x-file')
+```
+
+我们现在可以将存储在文件中的数据读回内存。
+
+```{.python .input}
+x2 = npx.load('x-file')
+x2
+```
+
+```{.python .input}
+#@tab pytorch
+x2 = torch.load('x-file')
+x2
+```
+
+```{.python .input}
+#@tab tensorflow
+x2 = np.load('x-file.npy', allow_pickle=True)
+x2
+```
+
+```{.python .input}
+#@tab paddle
+x2 = paddle.load('x-file')
+x2
+```
+
+我们可以[**存储一个张量列表，然后把它们读回内存。**]
+
+```{.python .input}
+y = np.zeros(4)
+npx.save('x-files', [x, y])
+x2, y2 = npx.load('x-files')
+(x2, y2)
+```
+
+```{.python .input}
+#@tab pytorch
+y = torch.zeros(4)
+torch.save([x, y],'x-files')
+x2, y2 = torch.load('x-files')
+(x2, y2)
+```
+
+```{.python .input}
+#@tab tensorflow
+y = tf.zeros(4)
+np.save('xy-files.npy', [x, y])
+x2, y2 = np.load('xy-files.npy', allow_pickle=True)
+(x2, y2)
+```
+
+```{.python .input}
+#@tab paddle
+y = paddle.zeros([4])
+paddle.save([x,y], 'x-file')
+x2, y2 = paddle.load('x-file')
+(x2, y2)
+```
+
+我们甚至可以(**写入或读取从字符串映射到张量的字典**)。
+当我们要读取或写入模型中的所有权重时，这很方便。
+
+```{.python .input}
+mydict = {'x': x, 'y': y}
+npx.save('mydict', mydict)
+mydict2 = npx.load('mydict')
+mydict2
+```
+
+```{.python .input}
+#@tab pytorch
+mydict = {'x': x, 'y': y}
+torch.save(mydict, 'mydict')
+mydict2 = torch.load('mydict')
+mydict2
+```
+
+```{.python .input}
+#@tab tensorflow
+mydict = {'x': x, 'y': y}
+np.save('mydict.npy', mydict)
+mydict2 = np.load('mydict.npy', allow_pickle=True)
+mydict2
+```
+
+```{.python .input}
+#@tab paddle
+mydict = {'x': x, 'y': y}
+paddle.save(mydict, 'mydict')
+mydict2 = paddle.load('mydict')
+mydict2
+```
+
+## [**加载和保存模型参数**]
+
+保存单个权重向量（或其他张量）确实有用，
+但是如果我们想保存整个模型，并在以后加载它们，
+单独保存每个向量则会变得很麻烦。
+毕竟，我们可能有数百个参数散布在各处。
+因此，深度学习框架提供了内置函数来保存和加载整个网络。
+需要注意的一个重要细节是，这将保存模型的参数而不是保存整个模型。
+例如，如果我们有一个3层多层感知机，我们需要单独指定架构。
+因为模型本身可以包含任意代码，所以模型本身难以序列化。
+因此，为了恢复模型，我们需要用代码生成架构，
+然后从磁盘加载参数。
+让我们从熟悉的多层感知机开始尝试一下。
+
+```{.python .input}
+class MLP(nn.Block):
+    def __init__(self, **kwargs):
+        super(MLP, self).__init__(**kwargs)
+        self.hidden = nn.Dense(256, activation='relu')
+        self.output = nn.Dense(10)
+
+    def forward(self, x):
+        return self.output(self.hidden(x))
+
+net = MLP()
+net.initialize()
+X = np.random.uniform(size=(2, 20))
+Y = net(X)
+```
+
+```{.python .input}
+#@tab pytorch
+class MLP(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.hidden = nn.Linear(20, 256)
+        self.output = nn.Linear(256, 10)
+
+    def forward(self, x):
+        return self.output(F.relu(self.hidden(x)))
+
+net = MLP()
+X = torch.randn(size=(2, 20))
+Y = net(X)
+```
+
+```{.python .input}
+#@tab tensorflow
+class MLP(tf.keras.Model):
+    def __init__(self):
+        super().__init__()
+        self.flatten = tf.keras.layers.Flatten()
+        self.hidden = tf.keras.layers.Dense(units=256, activation=tf.nn.relu)
+        self.out = tf.keras.layers.Dense(units=10)
+
+    def call(self, inputs):
+        x = self.flatten(inputs)
+        x = self.hidden(x)
+        return self.out(x)
+
+net = MLP()
+X = tf.random.uniform((2, 20))
+Y = net(X)
+```
+
+```{.python .input}
+#@tab paddle
+class MLP(nn.Layer):
+    def __init__(self):
+        super().__init__()
+        self.hidden = nn.Linear(20, 256)
+        self.output = nn.Linear(256, 10)
+
+    def forward(self, x):
+        return self.output(F.relu(self.hidden(x)))
+
+net = MLP()
+X = paddle.randn(shape=[2, 20])
+Y = net(X)
+```
+
+接下来，我们[**将模型的参数存储在一个叫做“mlp.params”的文件中。**]
+
+```{.python .input}
+net.save_parameters('mlp.params')
+```
+
+```{.python .input}
+#@tab pytorch
+torch.save(net.state_dict(), 'mlp.params')
+```
+
+```{.python .input}
+#@tab tensorflow
+net.save_weights('mlp.params')
+```
+
+```{.python .input}
+#@tab paddle
+paddle.save(net.state_dict(), 'mlp.pdparams')
+```
+
+为了恢复模型，我们[**实例化了原始多层感知机模型的一个备份。**]
+这里我们不需要随机初始化模型参数，而是(**直接读取文件中存储的参数。**)
+
+```{.python .input}
+clone = MLP()
+clone.load_parameters('mlp.params')
+```
+
+```{.python .input}
+#@tab pytorch
+clone = MLP()
+clone.load_state_dict(torch.load('mlp.params'))
+clone.eval()
+```
+
+```{.python .input}
+#@tab tensorflow
+clone = MLP()
+clone.load_weights('mlp.params')
+```
+
+```{.python .input}
+#@tab paddle
+clone = MLP()
+clone.set_state_dict(paddle.load('mlp.pdparams'))
+clone.eval()
+```
+
+由于两个实例具有相同的模型参数，在输入相同的`X`时，
+两个实例的计算结果应该相同。
+让我们来验证一下。
+
+```{.python .input}
+Y_clone = clone(X)
+Y_clone == Y
+```
+
+```{.python .input}
+#@tab pytorch, paddle
+Y_clone = clone(X)
+Y_clone == Y
+```
+
+```{.python .input}
+#@tab tensorflow
+Y_clone = clone(X)
+Y_clone == Y
+```
+
+## 小结
+
+* `save`和`load`函数可用于张量对象的文件读写。
+* 我们可以通过参数字典保存和加载网络的全部参数。
+* 保存架构必须在代码中完成，而不是在参数中完成。
+
+## 练习
+
+1. 即使不需要将经过训练的模型部署到不同的设备上，存储模型参数还有什么实际的好处？
+1. 假设我们只想复用网络的一部分，以将其合并到不同的网络架构中。比如想在一个新的网络中使用之前网络的前两层，该怎么做？
+1. 如何同时保存网络架构和参数？需要对架构加上什么限制？
+
+:begin_tab:`mxnet`
+[Discussions](https://discuss.d2l.ai/t/1840)
+:end_tab:
+
+:begin_tab:`pytorch`
+[Discussions](https://discuss.d2l.ai/t/1839)
+:end_tab:
+
+:begin_tab:`tensorflow`
+[Discussions](https://discuss.d2l.ai/t/1838)
+:end_tab:
+
+:begin_tab:`paddle`
+[Discussions](https://discuss.d2l.ai/t/11781)
+:end_tab:
+
+
+",oss://edu-test-graphrag-rw/dl/lecture/读写文件.md,,oss://edu-test-graphrag-rw/dl/code/读写文件.md,oss://edu-test-graphrag-rw/dl/video/读写文件.mp4,深度学习计算

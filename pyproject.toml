@@ -1,0 +1,73 @@
+[tool.poetry]
+name = "knowledge-graph"
+version = "0.1.0"
+description = "面向教育场景的知识图谱构建系统，支持多教材并存、前置关系推理与学习路径规划"
+authors = ["wzm110 <your-email@example.com>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/wzm110/knowledge-graph"
+repository = "https://github.com/wzm110/knowledge-graph"
+keywords = ["knowledge-graph", "education", "machine-learning", "deep-learning", "knowledge-base"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Education",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Education",
+]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pyyaml = "^6.0"
+pandas = "^2.0"
+openai = "^1.0"
+neo4j = "^5.0"
+lancedb = "^0.5"
+tiktoken = "^0.5"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4"
+pytest-cov = "^4.1"
+black = "^23.0"
+ruff = "^0.1"
+mypy = "^1.7"
+pre-commit = "^3.5"
+
+[tool.poetry.scripts]
+kg-build = "knowledge_graph:main"
+kg-query = "knowledge_graph.utils.query:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --cov=knowledge_graph --cov-report=term-missing"
+
+[tool.poetry]
+group = { dev = ["pytest", "pytest-cov"] }

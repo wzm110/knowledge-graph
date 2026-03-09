@@ -1,0 +1,75 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# PyCharm
+.idea/
+
+# VS Code
+.vscode/
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Logs
+logs/
+*.log
+
+# Output data (generated during build)
+data/output/
+output/
+
+# Neo4j
+neo4j_data/
+
+# LLM Cache
+llm_cache.json
+
+# Environment
+.env
+.env.local
+.env.*
+
+# IDE
+.trae/
+.路线/
+
+# OS
+.DS_Store
+Thumbs.db

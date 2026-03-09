@@ -1,0 +1,53 @@
+models:
+  default_chat_model:
+    type: chat
+    model_provider: openai
+    auth_type: api_key
+    api_key: ${OPENAI_API_KEY}
+    model: qwen3-max
+    model_supports_json: true
+    api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+    concurrent_requests: 5
+    async_mode: threaded
+    retry_strategy: exponential_backoff
+    max_retries: 10
+    tokens_per_minute: null
+    requests_per_minute: null
+
+  default_embedding_model:
+    type: embedding
+    model_provider: openai
+    auth_type: api_key
+    api_key: ${OPENAI_API_KEY}
+    model: text-embedding-v4
+    api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+    batch_size: 10
+    concurrent_requests: 10
+    async_mode: threaded
+    retry_strategy: exponential_backoff
+    max_retries: 10
+    tokens_per_minute: null
+    requests_per_minute: null
+
+neo4j:
+  uri: ${NEO4J_URI:-neo4j://127.0.0.1:7687}
+  user: ${NEO4J_USER:-neo4j}
+  password: ${NEO4J_PASSWORD}
+  database: ${NEO4J_DATABASE:-knowledge-graph}
+
+pipeline:
+  phase1:
+    max_workers: 5
+    batch_size: 10
+  phase2:
+    embedding_batch_size: 10
+    clustering_threshold: 0.8
+    min_mentions_for_l2: 2
+    min_text_blocks_for_l2: 2
+
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: logs/knowledge_graph.log
+  max_bytes: 10485760
+  backup_count: 5
