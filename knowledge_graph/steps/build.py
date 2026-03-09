@@ -19,8 +19,8 @@ def build_graph(config):
     
     try:
         # 读取校准后的数据
-        entities_file = 'output/calibrated_entities.csv'
-        relationships_file = 'output/calibrated_relationships.csv'
+        entities_file = 'data/output/calibrated_entities.csv'
+        relationships_file = 'data/output/calibrated_relationships.csv'
         
         logger.info(f"读取校准后的实体数据: {entities_file}")
         entities_df = pd.read_csv(entities_file, encoding='utf-8')

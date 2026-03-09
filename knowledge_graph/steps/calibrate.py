@@ -593,13 +593,13 @@ def calibrate_data(knowledge_points, resources, relationships, config=None, upda
         
         # 保存校准后的实体表
         calibrated_entities_df = pd.DataFrame(calibrated_entities)
-        calibrated_entities_file = 'output/calibrated_entities.csv'
+        calibrated_entities_file = 'data/output/calibrated_entities.csv'
         calibrated_entities_df.to_csv(calibrated_entities_file, index=False, encoding='utf-8')
         logger.info(f"实体校准完成，生成 {calibrated_entities_file}，共 {len(calibrated_entities)} 个实体")
         
         # 保存校准后的关系表
         calibrated_relationships_df = pd.DataFrame(calibrated_rels)
-        calibrated_relationships_file = 'output/calibrated_relationships.csv'
+        calibrated_relationships_file = 'data/output/calibrated_relationships.csv'
         calibrated_relationships_df.to_csv(calibrated_relationships_file, index=False, encoding='utf-8')
         logger.info(f"关系校准完成，生成 {calibrated_relationships_file}，共 {len(calibrated_rels)} 条关系")
         

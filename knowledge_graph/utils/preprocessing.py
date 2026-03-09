@@ -90,7 +90,7 @@ def data_preprocessing(config, input_file="data/input/多层感知机.csv"):
         
         # 保存处理后的数据
         processed_df = pd.DataFrame(processed_data)
-        output_file = 'output/processed_data.csv'
+        output_file = 'data/output/processed_data.csv'
         processed_df.to_csv(output_file, index=False, encoding='utf-8')
         logger.info(f"数据预处理完成，生成 {output_file}，共 {len(processed_data)} 个文本块")
         

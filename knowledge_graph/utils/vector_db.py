@@ -16,7 +16,7 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 class VectorDBManager:
-    def __init__(self, config, db_path="output/lancedb", force_recreate=False):
+    def __init__(self, config, db_path="data/output/lancedb", force_recreate=False):
         self.config = config
         self.db_path = db_path
         self.embedding_config = config['models']['default_embedding_model']

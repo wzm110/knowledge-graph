@@ -13,7 +13,7 @@ from utils.llm import call_llm, load_prompt
 logger = get_logger(__name__)
 
 # LLM 缓存文件
-LLM_CACHE_FILE = 'output/llm_cache.json'
+LLM_CACHE_FILE = 'data/output/llm_cache.json'
 
 # 加载 LLM 缓存
 def load_llm_cache():
@@ -255,13 +255,13 @@ def extract_entities_relations(processed_data, l1_concepts, config):
         
         # 保存实体表
         entities_df = pd.DataFrame(entities)
-        entities_file = 'output/entities.csv'
+        entities_file = 'data/output/entities.csv'
         entities_df.to_csv(entities_file, index=False, encoding='utf-8')
         logger.info(f"实体提取完成，生成 {entities_file}，共 {len(entities)} 个实体")
         
         # 生成关系表
         relationships_df = pd.DataFrame(relationships)
-        relationships_file = 'output/relationships.csv'
+        relationships_file = 'data/output/relationships.csv'
         relationships_df.to_csv(relationships_file, index=False, encoding='utf-8')
         logger.info(f"关系提取完成，生成 {relationships_file}，共 {len(relationships)} 条关系")
         
