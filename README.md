@@ -18,6 +18,10 @@ A knowledge graph construction system for education and learning scenarios. It s
 
 ![Architecture](./docs/architecture.svg)
 
+## Graph Database Schema
+
+![Micro Node Schema](./docs/images/微观节点.png)
+
 ## Project Goal
 
 In real teaching and learning processes, the same subject typically has various textbooks, courses, and teaching resources. Different textbooks have significant differences in chapter division, knowledge point sequence, and depth of explanation. However, what learners really need to master is the stable knowledge system, not the chapter structure of a specific textbook.
