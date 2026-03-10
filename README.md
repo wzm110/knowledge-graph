@@ -71,9 +71,12 @@ The core business goals of this system are:
 ### Step Details
 
 1. **Step 1: Extract L1 Concepts**
-   - Input: Table of Contents data (`目录.csv`)
-   - Extract top-level knowledge points (L1 concepts) using LLM
-   - Output: L1 concepts list
+   - Input: Table of contents from multiple textbooks
+     - `data/input/动手学深度学习_章节目录.txt`
+     - `data/input/深度学习DeepLearning_章节目录.txt`
+     - `data/input/神经网络与深度学习_章节目录.txt`
+   - Extract unified top-level knowledge points (L1 concepts) from multiple textbook TOCs using LLM
+   - Output: L1 concepts list (unified knowledge system)
 
 2. **Step 2: Extract Entities & Relations**
    - Input: Chunked CSV textbook data
@@ -134,9 +137,15 @@ knowledge-graph/
 ├── config/                    # Configuration files
 ├── data/
 │   └── input/               # Input textbook data
+│       ├── *_目录.txt        # Textbook table of contents (multiple)
+│       └── *.csv            # Chunked textbook content
 ├── docs/                     # Documentation & images
 ├── knowledge_graph/          # Main package
 │   ├── steps/              # Processing steps
+│   │   ├── extract_l1.py   # Step 1: Extract L1
+│   │   ├── extract.py       # Step 2: Extract entities
+│   │   ├── calibrate.py     # Step 3-4: Calibration
+│   │   └── build.py         # Step 5: Graph build
 │   └── utils/              # Utilities
 ├── tests/                   # Tests
 └── prompts/                 # LLM prompts
