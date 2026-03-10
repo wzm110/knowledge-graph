@@ -48,22 +48,30 @@ The core business goals of this system are:
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐       │
-│  │  Step 1      │     │  Step 2       │     │  Step 3      │       │
-│  │  Extract L1  │ ──→ │  Extract      │ ──→ │  Vectorize   │       │
-│  │  (TOC Data)  │     │  Entities     │     │              │       │
+│  │  Step 1     │     │  Step 1.5    │     │  Step 2      │       │
+│  │  Extract L1  │ ──→ │  Validate   │ ──→ │  Extract     │       │
+│  │              │     │  L1 (Opt)   │     │  Entities    │       │
 │  └──────────────┘     └──────────────┘     └──────────────┘       │
+│         │                                        │                  │
+│         │                                        ▼                  │
+│         │              ┌──────────────┐     ┌──────────────┐       │
+│         │              │  Step 3      │     │  Step 4      │       │
+│         │              │  Vectorize   │ ──→ │  Calibrate   │       │
+│         │              └──────────────┘     └──────────────┘       │
 │         │                    │                    │                  │
-│         ↓                    ↓                    ↓                  │
-│  ┌──────────────────────────────────────────────────────────────┐   │
-│  │                    Step 4: Calibration                      │   │
-│  │         (Deduplication, Hierarchy, Merge, Validation)        │   │
-│  └──────────────────────────────────────────────────────────────┘   │
-│                              │                                      │
-│                              ↓                                      │
-│  ┌──────────────────────────────────────────────────────────────┐   │
-│  │                    Step 5: Graph Update                     │   │
-│  │              (Update Vector DB + Import Neo4j)              │   │
-│  └──────────────────────────────────────────────────────────────┘   │
+│         │                    └────────────┬───────┘                  │
+│         │                             ▼                          │
+│         │              ┌──────────────────────────────┐            │
+│         │              │     Step 5: Graph Update   │            │
+│         │              │  (Update Vector DB + Neo4j)│            │
+│         │              └──────────────────────────────┘            │
+│         │                             │                            │
+│         └─────────────────────────────┘                            │
+│                              ▼                                      │
+│              ┌──────────────────────────────┐                     │
+│              │       Step 6: Query          │                     │
+│              │  (Vector Search + Neo4j)    │                     │
+│              └──────────────────────────────┘                     │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -78,19 +86,24 @@ The core business goals of this system are:
    - Extract unified top-level knowledge points (L1 concepts) from multiple textbook TOCs using LLM
    - Output: L1 concepts list (unified knowledge system)
 
-2. **Step 2: Extract Entities & Relations**
+2. **Step 1.5: L1 Concept Validation (Optional)**
+   - Input: L1 concepts list from Step 1
+   - Use LLM to evaluate and score each L1 concept
+   - Output: L1 concepts with scores and feedback
+
+3. **Step 2: Extract Entities & Relations**
    - Input: Chunked CSV textbook data
    - Extract knowledge points (L2, L3), relationships, and resources
    - Output: Entities, Relations, Resources
 
-3. **Step 3: Vectorization**
+4. **Step 3: Vectorization**
    - Vectorize extracted entities
    - Store in vector database
 
-4. **Step 4: Data Calibration**
+5. **Step 4: Data Calibration**
    - Deduplication, hierarchy assignment, validation
 
-5. **Step 5: Graph Update**
+6. **Step 5: Graph Update**
    - Update vector database
    - Import to Neo4j
 
@@ -124,10 +137,11 @@ cp .env.example .env
 poetry run python -m knowledge_graph
 
 # Step by step
-poetry run python -m knowledge_graph extract_l1    # Step 1
-poetry run python -m knowledge_graph extract       # Step 2
-poetry run python -m knowledge_graph calibrate     # Step 3-4
-poetry run python -m knowledge_graph build         # Step 5
+poetry run python -m knowledge_graph extract_l1     # Step 1: Extract L1
+poetry run python -m knowledge_graph validate_l1    # Step 1.5: Validate L1 (Optional)
+poetry run python -m knowledge_graph extract       # Step 2: Extract entities
+poetry run python -m knowledge_graph calibrate     # Step 3-4: Calibration
+poetry run python -m knowledge_graph build         # Step 5: Graph build
 ```
 
 ## Project Structure

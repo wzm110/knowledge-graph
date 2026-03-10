@@ -104,7 +104,7 @@ def main():
     parser.add_argument(
         'step',
         nargs='?',
-        choices=['full', 'extract_l1', 'extract', 'calibrate', 'build'],
+        choices=['full', 'extract_l1', 'validate_l1', 'extract', 'calibrate', 'build'],
         default='full',
         help='Which step to run: full (default), extract_l1, extract, calibrate, or build'
     )
@@ -119,6 +119,8 @@ def main():
         run_full_pipeline(config)
     elif args.step == 'extract_l1':
         run_extract_l1(config)
+    elif args.step == 'validate_l1':
+        run_validate_l1(config)
     elif args.step == 'extract':
         l1_concepts = load_l1_concepts()
         processed_data = load_input_data()
