@@ -8,7 +8,7 @@ import os
 import time
 import pandas as pd
 from neo4j import GraphDatabase
-from utils.logger import get_logger
+from knowledge_graph.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

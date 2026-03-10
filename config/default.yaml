@@ -3,7 +3,7 @@ models:
     type: chat
     model_provider: openai
     auth_type: api_key
-    api_key: ${OPENAI_API_KEY}
+    api_key: sk-ea728d0ab7204733b98dff3105926d97
     model: qwen3-max
     model_supports_json: true
     api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
@@ -18,7 +18,7 @@ models:
     type: embedding
     model_provider: openai
     auth_type: api_key
-    api_key: ${OPENAI_API_KEY}
+    api_key: sk-ea728d0ab7204733b98dff3105926d97
     model: text-embedding-v4
     api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
     batch_size: 10
@@ -32,7 +32,7 @@ models:
 neo4j:
   uri: ${NEO4J_URI:-neo4j://127.0.0.1:7687}
   user: ${NEO4J_USER:-neo4j}
-  password: ${NEO4J_PASSWORD}
+  password: ${NEO4J_PASSWORD:-12345678}
   database: ${NEO4J_DATABASE:-knowledge-graph}
 
 pipeline:

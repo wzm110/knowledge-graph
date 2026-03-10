@@ -1,4 +1,8 @@
-"""Step 1: Extract L1 Concepts from Table of Contents"""
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Step 1: Extract L1 Concepts from Table of Contents
+"""
 
 import os
 import re
@@ -6,7 +10,7 @@ import yaml
 import json
 import pandas as pd
 
-from knowledge_graph.utils.llm import LLMClient
+from knowledge_graph.utils.llm import call_llm
 from knowledge_graph.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -43,17 +47,15 @@ def extract_l1_concepts(toc_text: str, config: dict) -> list:
 
     logger.info(f"Found {len(chapters)} potential chapter titles")
 
-    llm_client = LLMClient(config)
     l1_concepts = []
 
     for i, chapter in enumerate(chapters, 1):
         logger.info(f"Processing chapter {i}/{len(chapters)}: {chapter}")
 
         prompt = prompt_template.replace("{{topic_name}}", chapter)
-        prompt = prompt.replace("{{aliases}}", "[]")
 
-        response = llm_client.chat(prompt)
         try:
+            response = call_llm(prompt, "", config)
             data = json.loads(response)
             concept = {
                 'id': f"l1-{i}",
@@ -74,6 +76,9 @@ def extract_l1_concepts(toc_text: str, config: dict) -> list:
             }
             l1_concepts.append(concept)
             logger.warning(f"  Failed to parse LLM response, using chapter title: {chapter}")
+        except Exception as e:
+            logger.error(f"  Error processing {chapter}: {e}")
+            continue
 
     return l1_concepts
 

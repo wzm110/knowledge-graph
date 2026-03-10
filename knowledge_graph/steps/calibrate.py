@@ -6,8 +6,8 @@
 
 import os
 import pandas as pd
-from src.utils.logger import get_logger
-from src.utils.vector_db import VectorDBManager, string_similarity
+from knowledge_graph.utils.logger import get_logger
+from knowledge_graph.utils.vector_db import VectorDBManager, string_similarity
 
 logger = get_logger(__name__)
 

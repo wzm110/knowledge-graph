@@ -7,8 +7,8 @@
 import os
 import json
 import pandas as pd
-from utils.logger import get_logger
-from utils.llm import call_llm, load_prompt
+from knowledge_graph.utils.logger import get_logger
+from knowledge_graph.utils.llm import call_llm, load_prompt
 
 logger = get_logger(__name__)
 

@@ -6,7 +6,7 @@
 
 import os
 import pandas as pd
-from utils.logger import get_logger
+from knowledge_graph.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

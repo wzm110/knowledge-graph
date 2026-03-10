@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Step 1.5: Validate L1 Concepts
+Step 2: Validate L1 Concepts
 Validate L1 concepts using LLM and provide quality scores
 """
 
@@ -10,7 +10,7 @@ import json
 import yaml
 import pandas as pd
 
-from knowledge_graph.utils.llm import LLMClient
+from knowledge_graph.utils.llm import call_llm
 from knowledge_graph.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -44,7 +44,7 @@ VALIDATION_PROMPT = """你是一名专业的课程体系设计专家，擅长评
 """
 
 
-def validate_l1_concept(concept: dict, llm_client: LLMClient) -> dict:
+def validate_l1_concept(concept: dict, config: dict) -> dict:
     """Validate a single L1 concept using LLM."""
     name = concept.get('name', '')
     definition = concept.get('definition', '')
@@ -58,7 +58,7 @@ def validate_l1_concept(concept: dict, llm_client: LLMClient) -> dict:
     )
 
     try:
-        response = llm_client.chat(prompt)
+        response = call_llm(prompt, "", config)
         result = json.loads(response)
 
         validated_concept = {
@@ -101,12 +101,11 @@ def validate_l1_concepts(l1_concepts: list, config: dict) -> list:
     """Validate all L1 concepts using LLM."""
     logger.info("Validating L1 concepts using LLM")
 
-    llm_client = LLMClient(config)
     validated_concepts = []
 
     for i, concept in enumerate(l1_concepts, 1):
         logger.info(f"Validating concept {i}/{len(l1_concepts)}")
-        validated = validate_l1_concept(concept, llm_client)
+        validated = validate_l1_concept(concept, config)
         validated_concepts.append(validated)
 
     valid_count = sum(1 for c in validated_concepts
@@ -172,9 +171,9 @@ def save_validation_report(validated_concepts: list, output_file: str = "data/ou
 
 
 def run(config: dict):
-    """Main function for Step 1.5."""
+    """Main function for Step 2."""
     logger.info("=" * 60)
-    logger.info("Step 1.5: Validate L1 Concepts")
+    logger.info("Step 2: Validate L1 Concepts")
     logger.info("=" * 60)
 
     input_file = "data/output/l1_concepts.yaml"
@@ -195,7 +194,7 @@ def run(config: dict):
     save_validation_report(validated_concepts, report_file)
 
     logger.info("=" * 60)
-    logger.info("Step 1.5 completed!")
+    logger.info("Step 2 completed!")
     logger.info("=" * 60)
 
 

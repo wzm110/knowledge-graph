@@ -7,7 +7,7 @@ LLM调用工具模块
 import openai
 import re
 import os
-from utils.logger import get_logger
+from knowledge_graph.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -36,18 +36,17 @@ def call_llm(prompt, text, config):
     
     try:
         # 构建完整的提示词，包含文本块内容
-        full_prompt = f"{prompt}\n\n文本块内容：\n{text}"
+        full_prompt = f"{prompt}\n\n文本块内容：\n{text}\n\n请以JSON格式输出结果。"
         logger.info(f"调用LLM，提示词长度: {len(full_prompt)}")
         logger.info(f"文本块长度: {len(text)}")
         logger.debug(f"完整提示词: {full_prompt}")
-        
+
         response = client.chat.completions.create(
             model=chat_config['model'],
             messages=[
                 {"role": "user", "content": full_prompt}
             ],
-            temperature=0.3,
-            response_format={"type": "json_object"} if chat_config.get('model_supports_json', False) else None
+            temperature=0.3
         )
         
         content = response.choices[0].message.content
