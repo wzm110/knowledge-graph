@@ -1,0 +1,144 @@
+请根据以下L1知识点列表和资源链接信息，完成以下任务：
+L1知识点列表：{l1_list}
+
+资源链接信息：
+{resource_links}
+
+任务1：判断当前文本块属于哪个L1知识点
+任务2：提取该L1下的L2和L3知识点
+任务3：从资源链接中提取Resource资源实体
+任务4：提取知识点之间的关系（contains关系、prerequisite关系）
+任务5：提取知识点与资源的关联关系（has_resource关系）
+
+## 实体提取规则
+
+### L2（子概念）提取规则：
+1. **定义**：L2是L1下的子概念，是相对独立的概念或理论
+2. **特征**：通常是具体的概念名称，如"前向传播"、"反向传播"、"计算图"等
+3. **提取方法**：
+   - 识别文本中的概念性术语
+   - 关注被定义或解释的术语
+   - 注意加粗、斜体或引号标记的术语
+   - 提取具有明确定义的概念
+   - **重要规则**：不允许提取与L1知识点同名的L2知识点
+   - **重要规则**：只提取已将文本块分配的L1下的子知识点
+4. **属性要求**：
+   - id：唯一标识符，格式为"l2_xxx"，其中xxx为概念名称的英文小写，单词间用下划线分隔
+   - name：概念名称
+   - level：固定为"L2"
+   - description：概念的详细描述
+   - difficulty：难度等级（基础、中等、高）
+   - aliases：别名列表，包括英文名称和其他常见称呼
+
+### L3（技能）提取规则：
+1. **定义**：L3是L2下的具体技能、实现方法或算法步骤
+2. **特征**：通常是具体的实现方法、算法步骤或操作流程
+3. **提取方法**：
+   - 识别文本中的步骤性描述
+   - 关注"实现"、"步骤"、"流程"等关键词
+   - 提取具体的技术实现细节
+   - 注意编号列表或步骤说明
+4. **属性要求**：
+   - id：唯一标识符，格式为"l3_xxx"，其中xxx为技能名称的英文小写，单词间用下划线分隔
+   - name：技能名称
+   - level：固定为"L3"
+   - description：技能的详细描述
+   - difficulty：难度等级（基础、中等、高）
+   - aliases：别名列表，包括英文名称和其他常见称呼
+
+### Resource（资源）提取规则：
+1. **定义**：Resource是支持知识点学习的配套资源
+2. **提取方法**：
+   - 从资源链接信息中提取
+   - 识别URL链接
+   - 根据链接类型确定资源类型
+3. **属性要求**：
+   - id：唯一标识符，格式为"res_xxx"，其中xxx为资源类型_资源名称的英文小写，单词间用下划线分隔
+   - url：资源的完整URL
+   - resource_type：资源类型（lecture、ppt、code、video等）
+
+## 关系提取规则
+
+### contains（包含）关系：
+1. **定义**：表示父知识点包含子知识点的层级关系
+2. **适用场景**：
+   - L1包含L2
+   - L2包含L3
+3. **方向**：从父知识点指向子知识点
+4. **提取方法**：
+   - 识别文本中明确的包含关系
+   - 基于层级结构推断包含关系
+   - 注意"包含"、"包括"、"由...组成"等关键词
+
+### prerequisite（前置）关系：
+1. **定义**：表示学习前置关系，即一个知识点是另一个知识点的前置条件
+2. **适用场景**：
+   - L2与L2之间
+   - L3与L3之间
+   - L2与L3之间
+3. **方向**：从前置知识点指向后续知识点
+4. **提取方法**：
+   - 识别文本中明确的依赖关系
+   - 关注"必须先"、"需要先"、"前置"、"基础"等关键词
+   - 根据逻辑顺序推断前置关系
+
+### has_resource（资源关联）关系：
+1. **定义**：表示知识点与资源之间的关联关系
+2. **适用场景**：知识点关联相关的学习资源
+3. **方向**：从知识点指向资源
+4. **提取方法**：
+   - 识别资源与知识点的关联
+   - 根据资源链接推断关联关系
+
+## 输出格式为JSON对象，包含：
+{
+    "l1_assignment": "所属L1知识点名称",
+    "l2_points": [每个L2知识点包含：id、name、level、description、difficulty、aliases],
+    "l3_points": [每个L3知识点包含：id、name、level、description、difficulty、aliases],
+    "resources": [每个资源包含：id、url、resource_type],
+    "relationships": [每个关系包含：type、start_id、end_id、end_type]
+}
+
+## 示例
+
+### 输入示例：
+L1知识点列表：["神经网络基础", "优化算法"]
+
+资源链接信息：
+{
+  "lecture": "https://example.com/lecture/backprop.md",
+  "code": "https://example.com/code/backprop.py"
+}
+
+文本块内容：
+前向传播是按顺序计算和存储神经网络中每层的结果。
+反向传播是计算神经网络参数梯度的方法，基于链式法则。
+计算图是用于可视化神经网络中变量与操作符之间依赖关系的有向图结构。
+要学习反向传播，必须先理解前向传播和计算图。
+
+### 输出示例：
+{
+  "l1_assignment": "神经网络基础",
+  "l2_points": [
+    {"id": "l2_forward_propagation", "name": "前向传播", "level": "L2", "description": "按顺序计算和存储神经网络中每层的结果", "difficulty": "基础", "aliases": ["forward propagation"]},
+    {"id": "l2_backward_propagation", "name": "反向传播", "level": "L2", "description": "计算神经网络参数梯度的方法，基于链式法则", "difficulty": "中等", "aliases": ["backward propagation"]},
+    {"id": "l2_computation_graph", "name": "计算图", "level": "L2", "description": "用于可视化神经网络中变量与操作符之间依赖关系的有向图结构", "difficulty": "基础", "aliases": ["computation graph"]}
+  ],
+  "l3_points": [],
+  "resources": [
+    {"id": "res_lecture_backprop", "url": "https://example.com/lecture/backprop.md", "resource_type": "lecture"},
+    {"id": "res_code_backprop", "url": "https://example.com/code/backprop.py", "resource_type": "code"}
+  ],
+  "relationships": [
+    {"type": "contains", "start_id": "神经网络基础", "end_id": "l2_forward_propagation", "end_type": "L2"},
+    {"type": "contains", "start_id": "神经网络基础", "end_id": "l2_backward_propagation", "end_type": "L2"},
+    {"type": "contains", "start_id": "神经网络基础", "end_id": "l2_computation_graph", "end_type": "L2"},
+    {"type": "prerequisite", "start_id": "l2_forward_propagation", "end_id": "l2_backward_propagation", "end_type": "L2"},
+    {"type": "prerequisite", "start_id": "l2_computation_graph", "end_id": "l2_backward_propagation", "end_type": "L2"},
+    {"type": "has_resource", "start_id": "l2_backward_propagation", "end_id": "res_lecture_backprop", "end_type": "Resource"},
+    {"type": "has_resource", "start_id": "l2_backward_propagation", "end_id": "res_code_backprop", "end_type": "Resource"}
+  ]
+}
+
+## 文本块内容
+{text}

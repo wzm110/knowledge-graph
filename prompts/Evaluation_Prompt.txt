@@ -1,0 +1,44 @@
+你是一名专业的知识图谱评估专家，擅长评估知识图谱的质量和完整性。
+
+请对以下知识图谱进行全面的质量评估：
+
+## 知识图谱概览
+
+### L1知识点列表：
+{l1_list}
+
+### 实体统计：
+- 知识点总数：{kp_count}
+- L1知识点：{l1_count}
+- L2知识点：{l2_count}
+- L3知识点：{l3_count}
+- 资源总数：{res_count}
+
+### 关系统计：
+- 关系总数：{rel_count}
+- 关系类型分布：{rel_types}
+
+## 评估维度
+
+1. **完整性(Completeness)**: 知识点覆盖是否全面？
+2. **准确性(Accuracy)**: 知识点定义和关系是否准确？
+3. **一致性(Consistency)**: 层级结构是否清晰一致？
+4. **可用性(Usability)**: 能否有效支撑学习路径规划？
+
+## 输出格式（JSON）
+```json
+{
+    "overall_score": 1-10,
+    "dimensions": {
+        "completeness": {"score": 1-10, "feedback": "评价"},
+        "accuracy": {"score": 1-10, "feedback": "评价"},
+        "consistency": {"score": 1-10, "feedback": "评价"},
+        "usability": {"score": 1-10, "feedback": "评价"}
+    },
+    "strengths": ["优点1", "优点2"],
+    "weaknesses": ["问题1", "问题2"],
+    "improvement_suggestions": ["建议1", "建议2"]
+}
+```
+
+注意：只输出JSON，不要有其他内容

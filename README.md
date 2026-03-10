@@ -1,200 +1,193 @@
-# Knowledge Graph Builder
+# Knowledge Graph Builder - 知识图谱构建工具
 
-[English](./README.md) | [中文](./README_zh.md)
+基于LLM的自动化知识图谱构建流水线，从教材内容中提取知识点、关系和资源。
 
-<div align="center">
+## 功能特性
 
-![Knowledge Graph Builder](./docs/logo.svg)
+### 🚀 核心功能
+- **L1知识点提取**: 从教材目录自动提取顶层知识点
+- **智能验证**: 基于反馈循环的知识点质量验证
+- **前置关系提取**: 自动分析知识点间的学习依赖关系
+- **实体关系提取**: 从教材内容提取L2/L3知识点和关系
+- **向量检索**: 支持语义相似度搜索
+- **Neo4j图谱**: 构建可查询的知识图谱
 
-[![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
-[![GitHub Stars](https://img.shields.io/github/stars/wzm110/knowledge-graph?style=social)](https://github.com/wzm110/knowledge-graph)
+### ⚡ 性能优化
+- **LLM缓存**: 相同输入自动复用结果，支持断点恢复
+- **进度条**: 实时显示处理进度
+- **Parquet存储**: 高效的列式存储格式
 
-A knowledge graph construction system for education and learning scenarios. It supports multiple textbooks, prerequisite relationship inference, and learning path planning.
+### 🏗️ 架构
+- **LangGraph风格**: 8步流水线设计，清晰的任务分工
+- **Agent模块化**: 每个节点独立可扩展
+- **状态持久化**: 支持从任意阶段恢复
 
-</div>
-
-## Architecture
-
-![Architecture](./docs/architecture.svg)
-
-## Graph Database Schema
-
-![Micro Node Schema](./docs/images/微观节点.png)
-
-## Project Goal
-
-In real teaching and learning processes, the same subject typically has various textbooks, courses, and teaching resources. Different textbooks have significant differences in chapter division, knowledge point sequence, and depth of explanation. However, what learners really need to master is the stable knowledge system, not the chapter structure of a specific textbook.
-
-The core business goals of this system are:
-- Decouple textbook structure from knowledge ontology to build a unified knowledge base
-- Support intelligent learning and teaching applications
-- Enable prerequisite relationship inference and learning path planning
-
-## Features
-
-- **Multi-textbook Support**: Decouples textbook structure from knowledge ontology
-- **Hierarchical Knowledge Points**: L1 (top-level), L2, L3 (detailed) concept system
-- **Prerequisite Inference**: Automatically infer learning prerequisite relationships using LLM
-- **Learning Path Planning**: Build personalized learning paths based on knowledge graphs
-- **Neo4j Integration**: Store and query knowledge graphs in Neo4j
-- **Vector Similarity**: Support semantic similarity search using vector databases
-
-## Build Pipeline
+## 项目结构
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                     Knowledge Graph Build Pipeline                   │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐       │
-│  │  Step 1     │     │  Step 1.5    │     │  Step 2      │       │
-│  │  Extract L1  │ ──→ │  Validate   │ ──→ │  Extract     │       │
-│  │              │     │  L1 (Opt)   │     │  Entities    │       │
-│  └──────────────┘     └──────────────┘     └──────────────┘       │
-│         │                                        │                  │
-│         │                                        ▼                  │
-│         │              ┌──────────────┐     ┌──────────────┐       │
-│         │              │  Step 3      │     │  Step 4      │       │
-│         │              │  Vectorize   │ ──→ │  Calibrate   │       │
-│         │              └──────────────┘     └──────────────┘       │
-│         │                    │                    │                  │
-│         │                    └────────────┬───────┘                  │
-│         │                             ▼                          │
-│         │              ┌──────────────────────────────┐            │
-│         │              │     Step 5: Graph Update   │            │
-│         │              │  (Update Vector DB + Neo4j)│            │
-│         │              └──────────────────────────────┘            │
-│         │                             │                            │
-│         └─────────────────────────────┘                            │
-│                              ▼                                      │
-│              ┌──────────────────────────────┐                     │
-│              │       Step 6: Query          │                     │
-│              │  (Vector Search + Neo4j)    │                     │
-│              └──────────────────────────────┘                     │
-│                                                                      │
-└─────────────────────────────────────────────────────────────────────┘
+knowledge_graph/
+├── agents/                    # 智能体模块
+│   ├── base_agent.py         # Agent基类
+│   ├── l1_extractor.py       # Node 1: L1知识点提取
+│   ├── l1_validator.py       # Node 2: L1验证
+│   ├── l1_prerequisite.py   # Node 3: 前置关系提取
+│   ├── entity_extractor.py   # Node 4: 实体关系提取
+│   ├── vectorization.py      # Node 5: 向量化
+│   ├── calibration.py        # Node 6: 数据校准
+│   ├── evaluation.py         # Node 7: LLM评测
+│   └── graph_builder.py     # Node 8: 图谱构建
+├── utils/                    # 工具模块
+│   ├── config.py            # 配置管理
+│   ├── llm.py              # LLM调用(含缓存)
+│   ├── logger.py            # 日志工具
+│   ├── vector_db.py         # 向量数据库
+│   └── preprocessing.py     # 数据预处理
+├── pipeline.py               # 主流水线入口
+└── __main__.py              # CLI入口
+
+prompts/                      # 提示词模板
+├── L1_Extraction_Prompt.txt
+├── L1_Validation_Prompt.txt
+├── L1_Prerequisite_Prompt.txt
+├── Entity_Extraction_Prompt.txt
+└── Evaluation_Prompt.txt
+
+config/
+└── default.yaml             # 配置文件
 ```
 
-### Step Details
+## 快速开始
 
-1. **Step 1: Extract L1 Concepts**
-   - Input: Table of contents from multiple textbooks
-     - `data/input/动手学深度学习_章节目录.txt`
-     - `data/input/深度学习DeepLearning_章节目录.txt`
-     - `data/input/神经网络与深度学习_章节目录.txt`
-   - Extract unified top-level knowledge points (L1 concepts) from multiple textbook TOCs using LLM
-   - Output: L1 concepts list (unified knowledge system)
-
-2. **Step 1.5: L1 Concept Validation (Optional)**
-   - Input: L1 concepts list from Step 1
-   - Use LLM to evaluate and score each L1 concept
-   - Output: L1 concepts with scores and feedback
-
-3. **Step 2: Extract Entities & Relations**
-   - Input: Chunked CSV textbook data
-   - Extract knowledge points (L2, L3), relationships, and resources
-   - Output: Entities, Relations, Resources
-
-4. **Step 3: Vectorization**
-   - Vectorize extracted entities
-   - Store in vector database
-
-5. **Step 4: Data Calibration**
-   - Deduplication, hierarchy assignment, validation
-
-6. **Step 5: Graph Update**
-   - Update vector database
-   - Import to Neo4j
-
-## Quick Start
-
-### Prerequisites
-
-- Python 3.10+
-- Neo4j 5.x
-- OpenAI API Key (or compatible API)
-
-### Installation
-
+### 安装依赖
 ```bash
-# Clone repository
-git clone https://github.com/wzm110/knowledge-graph.git
-cd knowledge-graph
+pip install -r requirements.txt
+```
 
-# Install dependencies
-poetry install
-
-# Copy environment configuration
+### 配置
+复制并编辑配置文件:
+```bash
 cp .env.example .env
-# Edit .env with your API Key
+# 编辑 .env 填入API密钥
 ```
 
-### Usage
-
+### 运行
 ```bash
-# Full pipeline
-poetry run python -m knowledge_graph
+# 完整流程
+python -m knowledge_graph.pipeline
 
-# Step by step
-poetry run python -m knowledge_graph extract_l1     # Step 1: Extract L1
-poetry run python -m knowledge_graph validate_l1    # Step 1.5: Validate L1 (Optional)
-poetry run python -m knowledge_graph extract       # Step 2: Extract entities
-poetry run python -m knowledge_graph calibrate     # Step 3-4: Calibration
-poetry run python -m knowledge_graph build         # Step 5: Graph build
+# 测试模式(仅处理少量数据)
+python -m knowledge_graph.pipeline --test
+
+# 自定义验证循环次数
+python -m knowledge_graph.pipeline --max-loops 5
 ```
 
-## Project Structure
+## 数据流
 
 ```
-knowledge-graph/
-├── config/                    # Configuration files
-├── data/
-│   └── input/               # Input textbook data
-│       ├── *_目录.txt        # Textbook table of contents (multiple)
-│       └── *.csv            # Chunked textbook content
-├── docs/                     # Documentation & images
-├── knowledge_graph/          # Main package
-│   ├── steps/              # Processing steps
-│   │   ├── extract_l1.py   # Step 1: Extract L1
-│   │   ├── extract.py       # Step 2: Extract entities
-│   │   ├── calibrate.py     # Step 3-4: Calibration
-│   │   └── build.py         # Step 5: Graph build
-│   └── utils/              # Utilities
-├── tests/                   # Tests
-└── prompts/                 # LLM prompts
+输入数据
+  │
+  ├─→ Table_of_Contents/     # 教材目录
+  └─→ *.csv                   # 教材内容
+          │
+          ▼
+┌─────────────────────────────────────────────┐
+│  Node 1-2: L1提取 + 验证 (带反馈循环)       │
+└─────────────────────────────────────────────┘
+          │
+          ▼ stage1_entities.parquet (L1)
+┌─────────────────────────────────────────────┐
+│  Node 3: L1前置关系提取                      │
+└─────────────────────────────────────────────┘
+          │
+          ▼ stage2_relationships.parquet
+┌─────────────────────────────────────────────┐
+│  Node 4: 实体关系提取 (L2/L3)               │
+└─────────────────────────────────────────────┘
+          │
+          ▼ stage3_entities.parquet
+          ▼ stage3_relationships.parquet
+┌─────────────────────────────────────────────┐
+│  Node 5-6: 向量化 + 校准                    │
+└─────────────────────────────────────────────┘
+          │
+          ▼ calibrated_entities.parquet
+          ▼ calibrated_relationships.parquet
+┌─────────────────────────────────────────────┐
+│  Node 7-8: 评测 + Neo4j图谱                │
+└─────────────────────────────────────────────┘
 ```
 
-## Knowledge Hierarchy
+## 中间文件说明
 
-| Level | Description | Example |
-|-------|-------------|---------|
-| L1 | Top-level concepts | Neural Network Basics, CNN |
-| L2 | Sub-concepts | Backpropagation, Activation Functions |
-| L3 | Detailed points | Sigmoid Gradient Computation |
+| 文件 | 说明 |
+|------|------|
+| stage1_entities.parquet | L1知识点 |
+| stage2_relationships.parquet | L1前置关系 |
+| stage3_entities.parquet | L2/L3知识点 |
+| stage3_relationships.parquet | L2/L3关系 |
+| calibrated_entities.parquet | 校准后全量知识点 |
+| calibrated_relationships.parquet | 校准后全量关系 |
 
-## Relationship Types
+支持从任意阶段读取中间文件单独调试后续步骤。
 
-| Type | Description |
-|------|-------------|
-| `contains` | Hierarchy (L1→L2→L3) |
-| `prerequisite` | Learning prerequisites |
-| `has_resource` | Linked resources |
+## 配置说明
 
-## Data
+```yaml
+pipeline:
+  subject: 深度学习          # 科目背景
+  max_workers: 5            # 并发数
+  batch_size: 10            # 批处理大小
 
-The textbook data included in this project is **sample data** from [D2L (Dive into Deep Learning)](https://d2l.ai/).
+models:
+  default_chat_model:
+    model: qwen3-max        # LLM模型
+    api_key: ${API_KEY}    # API密钥
+    api_base: https://dashscope.aliyuncs.com/...
+    temperature: 0.3
 
-## License
+vector_db:
+  provider: lancedb
+  path: data/output/lancedb
 
-MIT License - see [LICENSE](./LICENSE) for details.
+neo4j:
+  uri: neo4j://127.0.0.1:7687
+  user: neo4j
+  password: ${NEO4J_PASSWORD}
+```
 
-## Contributing
+## 版本历史
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+### v1.0.0 (2026-03-10)
+**重大更新: LangGraph重构**
 
-## Acknowledgments
+#### 新增功能
+- ✅ 完整8步LangGraph风格流水线
+- ✅ L1知识点智能验证(带反馈循环)
+- ✅ 整体评估模式(而非单个知识点评估)
+- ✅ 科目背景支持(可配置)
+- ✅ 大局观评估原则
 
-- [D2L (Dive into Deep Learning)](https://d2l.ai/) - Sample textbook data
-- [OpenAI](https://openai.com/) - LLM API
-- [Neo4j](https://neo4j.com/) - Graph database
+#### 架构改进
+- ✅ Agent模块化设计
+- ✅ Parquet中间文件存储
+- ✅ 支持断点恢复
+- ✅ LLM响应缓存
+- ✅ 进度条显示
+- ✅ 全中文日志
+
+#### 提示词优化
+- ✅ 实体提取提示词完善(L2/L3/Resource)
+- ✅ 包含示例输出
+- ✅ 评估规则细化
+
+#### 数据格式
+- ✅ Parquet替代CSV存储
+- ✅ 分阶段中间文件
+- ✅ 支持单独调试数据校准
+
+---
+
+### v0.x (早期版本)
+- 初始版本
+- 基本的实体关系提取

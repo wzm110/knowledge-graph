@@ -91,9 +91,9 @@
 
 1. **步骤1: 提取L1概念**
    - 输入: 多本教材的章节目录
-     - `data/input/动手学深度学习_章节目录.txt`
-     - `data/input/深度学习DeepLearning_章节目录.txt`
-     - `data/input/神经网络与深度学习_章节目录.txt`
+     - `data/input/Table_of_Contents/动手学深度学习_章节目录.txt`
+     - `data/input/Table_of_Contents/深度学习DeepLearning_章节目录.txt`
+     - `data/input/Table_of_Contents/神经网络与深度学习_章节目录.txt`
    - 通过LLM从多本教材的章节目录中提取统一的顶层知识点（L1概念）
    - 输出: L1概念列表（统一的知识体系）
 

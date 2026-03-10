@@ -1,139 +1,38 @@
 """Knowledge Graph Builder - Main Entry Point"""
 
 import os
-import sys
-import glob as glob_module
 import argparse
 
 from knowledge_graph.utils.logger import get_logger
-from knowledge_graph.utils.config import load_config, load_l1_concepts
-from knowledge_graph.steps.extract_l1 import run as run_extract_l1
-from knowledge_graph.steps.validate_l1 import run as run_validate_l1
-from knowledge_graph.steps.extract_l1_rels import run as run_extract_l1_rels
-from knowledge_graph.steps.extract import extract_entities_relations
-from knowledge_graph.steps.vectorize import run as run_vectorize
-from knowledge_graph.steps.calibrate import calibrate_data
-from knowledge_graph.steps.evaluate import run as run_evaluate
-from knowledge_graph.steps.build import build_graph
+from knowledge_graph.utils.config import load_config
 
 logger = get_logger(__name__)
 
 
-def load_input_data(input_dir: str = "data/input"):
-    """Load input CSV data."""
-    processed_data = []
-    chunk_id = 0
-
-    csv_files = glob_module.glob(f"{input_dir}/*.csv")
-    logger.info(f"Found {len(csv_files)} CSV files")
-
-    for csv_file in csv_files:
-        if os.path.basename(csv_file) == "目录.csv":
-            continue
-
-        logger.info(f"Reading input file: {csv_file}")
-        import pandas as pd
-        df = pd.read_csv(csv_file, encoding='utf-8-sig')
-        logger.info(f"Successfully read {len(df)} chapters")
-
-        for chapter_id, row in df.iterrows():
-            chapter_title = row.get('title', row.get(df.columns[0], ''))
-            text = row.get('text', '')
-            lecture_link = row.get('lecture_link', '')
-            ppt_link = row.get('ppt_link', '')
-            code_link = row.get('code_link', '')
-            video_link = row.get('video_link', '')
-
-            text = text.strip()
-
-            processed_item = {
-                'chapter_id': chapter_id,
-                'chapter_title': chapter_title,
-                'chunk_id': chunk_id,
-                'text_chunk': text,
-                'lecture_link': lecture_link,
-                'ppt_link': ppt_link,
-                'code_link': code_link,
-                'video_link': video_link
-            }
-            processed_data.append(processed_item)
-            chunk_id += 1
-
-    logger.info(f"Reading completed, total {len(processed_data)} text chunks")
-    return processed_data
-
-
-def run_full_pipeline(config: dict):
-    """Run the full knowledge graph construction pipeline (8 steps)."""
-    logger.info("=" * 60)
-    logger.info("Knowledge Graph Construction Pipeline Started (8 Steps)")
-    logger.info("=" * 60)
-
-    # Step 1: Extract L1 Concepts
-    logger.info("\n=== Step 1: Extract L1 Concepts ===")
-    run_extract_l1(config)
-
-    # Step 2: Validate L1 Concepts
-    logger.info("\n=== Step 2: Validate L1 Concepts ===")
-    run_validate_l1(config)
-
-    # Step 3: Extract L1 Prerequisite Relationships
-    logger.info("\n=== Step 3: Extract L1 Prerequisite Relationships ===")
-    run_extract_l1_rels(config)
-
-    # Step 4: Extract Entities and Relations
-    logger.info("\n=== Step 4: Extract Entities and Relations ===")
-    l1_concepts = load_l1_concepts()
-    processed_data = load_input_data()
-    knowledge_points, resources, relationships = extract_entities_relations(
-        processed_data, l1_concepts, config
-    )
-    logger.info(f"Extraction completed: {len(knowledge_points)} KPs, {len(resources)} resources, {len(relationships)} relations")
-
-    # Step 5: Vectorization
-    logger.info("\n=== Step 5: Vectorization ===")
-    run_vectorize(config)
-
-    # Step 6: Calibration
-    logger.info("\n=== Step 6: Calibration ===")
-    calibrated_kps, calibrated_resources, calibrated_rels = calibrate_data(
-        knowledge_points, resources, relationships
-    )
-    logger.info(f"Calibration completed: {len(calibrated_kps)} KPs, {len(calibrated_resources)} resources, {len(calibrated_rels)} relations")
-
-    # Step 7: LLM Evaluation
-    logger.info("\n=== Step 7: LLM Evaluation ===")
-    run_evaluate(config)
-
-    # Step 8: Build Graph
-    logger.info("\n=== Step 8: Build Graph ===")
-    build_graph(config)
-
-    logger.info("=" * 60)
-    logger.info("Knowledge Graph Construction Pipeline Completed!")
-    logger.info("=" * 60)
-
-
 def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(description="Knowledge Graph Builder - 8 Step Pipeline")
+    parser = argparse.ArgumentParser(description="知识图谱构建流水线 - 8步")
     parser.add_argument(
         'step',
         nargs='?',
         choices=[
-            'full',           # All 8 steps
-            'extract_l1',    # Step 1
-            'validate_l1',   # Step 2
-            'extract_l1_rels', # Step 3
-            'extract',       # Step 4
-            'vectorize',     # Step 5
-            'calibrate',     # Step 6
-            'evaluate',      # Step 7
-            'build'          # Step 8
+            'full',           # 全部8步
+            'extract_l1',    # 步骤1
+            'validate_l1',   # 步骤2
+            'extract_l1_rels', # 步骤3
+            'extract',       # 步骤4
+            'vectorize',     # 步骤5
+            'calibrate',     # 步骤6
+            'evaluate',      # 步骤7
+            'build'          # 步骤8
         ],
         default='full',
-        help='Which step to run'
+        help='选择要运行的步骤'
     )
+    parser.add_argument('--test', action='store_true',
+                       help='测试模式：仅处理2个章节用于快速验证')
+    parser.add_argument('--max-loops', type=int, default=3,
+                       help='最大验证循环次数 (默认: 3)')
     args = parser.parse_args()
 
     os.makedirs('data/output', exist_ok=True)
@@ -142,34 +41,64 @@ def main():
     config = load_config()
 
     if args.step == 'full':
-        run_full_pipeline(config)
+        from knowledge_graph.pipeline import run_full_pipeline
+        run_full_pipeline(config, max_loops=args.max_loops, test_mode=args.test)
     elif args.step == 'extract_l1':
-        run_extract_l1(config)
+        from knowledge_graph.agents.l1_extractor import create_l1_extractor
+        agent = create_l1_extractor(config)
+        from knowledge_graph.pipeline import PipelineState
+        state = PipelineState({'config': config})
+        state = agent.execute(state)
+        logger.info(f"步骤1完成: 提取了 {len(state.get('l1_concepts', []))} 个L1知识点")
     elif args.step == 'validate_l1':
-        run_validate_l1(config)
+        from knowledge_graph.agents.l1_validator import create_l1_validator
+        agent = create_l1_validator(config)
+        from knowledge_graph.pipeline import PipelineState
+        state = PipelineState({'config': config})
+        state = agent.execute(state)
+        logger.info(f"步骤2完成: 验证了 {len(state.get('validated_l1_concepts', []))} 个L1知识点")
     elif args.step == 'extract_l1_rels':
-        run_extract_l1_rels(config)
+        from knowledge_graph.agents.l1_prerequisite import create_l1_prerequisite_agent
+        agent = create_l1_prerequisite_agent(config)
+        from knowledge_graph.pipeline import PipelineState
+        state = PipelineState({'config': config})
+        state = agent.execute(state)
+        logger.info(f"步骤3完成: 提取了 {len(state.get('l1_prerequisites', []))} 条前置关系")
     elif args.step == 'extract':
-        l1_concepts = load_l1_concepts()
-        processed_data = load_input_data()
-        knowledge_points, resources, relationships = extract_entities_relations(
-            processed_data, l1_concepts, config
-        )
-        logger.info(f"Step 4 completed: {len(knowledge_points)} KPs, {len(resources)} resources, {len(relationships)} relations")
+        from knowledge_graph.agents.entity_extractor import create_entity_extractor
+        agent = create_entity_extractor(config)
+        from knowledge_graph.pipeline import PipelineState
+        state = PipelineState({'config': config, '_test_mode': args.test, '_max_chapters': 2})
+        state = agent.execute(state)
+        logger.info(f"步骤4完成: {len(state.get('knowledge_points', []))} 个知识点, {len(state.get('resources', []))} 个资源, {len(state.get('relationships', []))} 条关系")
     elif args.step == 'vectorize':
-        run_vectorize(config)
+        from knowledge_graph.agents.vectorization import create_vectorization_agent
+        agent = create_vectorization_agent(config)
+        from knowledge_graph.pipeline import PipelineState
+        state = PipelineState({'config': config})
+        state = agent.execute(state)
+        logger.info(f"步骤5完成: 向量化完成")
     elif args.step == 'calibrate':
-        from knowledge_graph.utils.config import load_entities_relations
-        knowledge_points, resources, relationships = load_entities_relations()
-        calibrated_kps, calibrated_resources, calibrated_rels = calibrate_data(
-            knowledge_points, resources, relationships
-        )
-        logger.info(f"Step 6 completed: {len(calibrated_kps)} KPs, {len(calibrated_resources)} resources, {len(calibrated_rels)} relations")
+        from knowledge_graph.agents.calibration import create_calibration_agent
+        agent = create_calibration_agent(config)
+        from knowledge_graph.pipeline import PipelineState
+        state = PipelineState({'config': config})
+        state = agent.execute(state)
+        logger.info(f"步骤6完成: {len(state.get('calibrated_kps', []))} 个知识点, {len(state.get('calibrated_resources', []))} 个资源, {len(state.get('calibrated_relationships', []))} 条关系")
     elif args.step == 'evaluate':
-        run_evaluate(config)
+        from knowledge_graph.agents.evaluation import create_evaluation_agent
+        agent = create_evaluation_agent(config)
+        from knowledge_graph.pipeline import PipelineState
+        state = PipelineState({'config': config})
+        state = agent.execute(state)
+        logger.info(f"步骤7完成: 评测完成")
     elif args.step == 'build':
-        build_graph(config)
-        logger.info("Step 8 completed: Graph built successfully")
+        from knowledge_graph.agents.graph_builder import create_graph_builder_agent
+        agent = create_graph_builder_agent(config)
+        from knowledge_graph.pipeline import PipelineState
+        state = PipelineState({'config': config})
+        state = agent.execute(state)
+        logger.info(f"步骤8完成: 图谱构建完成")
 
 
 if __name__ == "__main__":

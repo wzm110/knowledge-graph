@@ -16,60 +16,37 @@ parts/
 sdist/
 var/
 wheels/
-pip-wheel-metadata/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-MANIFEST
 
 # Virtual environments
 venv/
 env/
 ENV/
-env.bak/
-venv.bak/
 
-# PyCharm
-.idea/
-
-# VS Code
+# IDEs
 .vscode/
-
-# Pytest
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-
-# MyPy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Logs
-logs/
-*.log
-
-# Output data (generated during build)
-data/output/
-output/
-
-# Neo4j
-neo4j_data/
-
-# LLM Cache
-llm_cache.json
-
-# Environment
-.env
-.env.local
-.env.*
-
-# IDE
-.trae/
-.路线/
+.idea/
+*.swp
+*.swo
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Project specific
+data/input/
+data/output/*.parquet
+data/output/*.csv
+data/output/*.json
+data/output/*.yaml
+data/output/llm_cache/
+data/output/lancedb/
+data/output/agent_state/
+logs/
+*.log
+
+# Environment
+.env
+.env.local
