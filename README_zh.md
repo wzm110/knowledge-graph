@@ -22,7 +22,7 @@
 
 README 里不能运行 JS，所以完整版交互放在 GitHub Pages。启用后点击下图进入 Demo：
 
-[![Interactive Matrix Demo](docs/architecture.png)](docs/index.html)
+[![Interactive Matrix Demo](docs/images/demo_preview.gif)](docs/index.html)
 
 ---
 
@@ -179,7 +179,7 @@ poetry run python -m knowledge_graph full --incremental
 
 ---
 
-## 项目结构（融合旧版 README）
+## 项目结构
 
 ```text
 graph/
@@ -199,7 +199,7 @@ graph/
 
 ---
 
-## 数据流（融合旧版 README，按当前实现对齐）
+## 数据流（按当前实现对齐）
 
 ```text
 输入数据

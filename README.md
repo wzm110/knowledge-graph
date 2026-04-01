@@ -22,7 +22,7 @@ Build a **course knowledge graph** from textbook chapters (CSV) and TOC files, t
 
 GitHub README can’t run JavaScript. The full interactive matrix lives on GitHub Pages. Enable Pages, then click the preview:
 
-[![Interactive Matrix Demo](docs/architecture.png)](docs/index.html)
+[![Interactive Matrix Demo](docs/images/demo_preview.gif)](docs/index.html)
 
 ---
 
