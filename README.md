@@ -20,12 +20,6 @@
 
 ![知识图谱构建流水线架构图](docs/architecture.png)
 
-### 可交互预览（GitHub Pages）
-
-README 里不能运行 JS，所以完整版交互放在 GitHub Pages。启用后点击下图进入 Demo：
-
-[![Interactive Matrix Demo](docs/images/demo_preview.gif)](docs/index.html)
-
 ---
 
 ## Overview（这项目能做什么）
@@ -74,17 +68,6 @@ poetry run python -m knowledge_graph.pipeline
 ```bash
 poetry run python -m knowledge_graph
 ```
-
----
-
-## 启用 GitHub Pages（让 Demo 真正可交互）
-
-1. GitHub 仓库 → **Settings** → **Pages**
-2. **Build and deployment**
-   - Source 选 **Deploy from a branch**
-   - Branch 选 **main**，Folder 选 **/docs**
-3. 保存后等待 1-2 分钟，访问你的 Pages 地址：
-   - `https://<你的用户名>.github.io/<仓库名>/`
 
 ---
 
@@ -233,7 +216,7 @@ Step 8: Neo4j 入库（知识点图，过滤 has_resource）
 
 ## 本次更新说明（你会感知到的变化）
 
-- **README 更可上手**：补齐 GitHub Pages 交互 Demo（README 预览 + /docs 站点）
+- **README 更可上手**：中文优先展示，提供中英切换入口
 - **新增示例配置**：`config/default.example.yaml`（不含密钥，逐项注释），本地复制为 `config/default.yaml` 使用
 - **文档全面对齐代码**：`docs/**` 中 6.5/7.5、评测产物路径、资源边界等与实际实现保持一致
 

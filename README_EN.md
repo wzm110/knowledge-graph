@@ -20,12 +20,6 @@ Build a **course knowledge graph** from textbook chapters (CSV) and TOC files, t
 
 ![Knowledge Graph Pipeline](docs/architecture.png)
 
-### Interactive preview (GitHub Pages)
-
-GitHub README can’t run JavaScript. The full interactive matrix lives on GitHub Pages. Enable Pages, then click the preview:
-
-[![Interactive Matrix Demo](docs/images/demo_preview.gif)](docs/index.html)
-
 ---
 
 ## Overview
@@ -73,17 +67,6 @@ Equivalent entrypoint:
 ```bash
 poetry run python -m knowledge_graph
 ```
-
----
-
-## Enable GitHub Pages (to run the demo)
-
-1. Repo → **Settings** → **Pages**
-2. Build and deployment
-   - Source: **Deploy from a branch**
-   - Branch: **main**, Folder: **/docs**
-3. Wait ~1–2 minutes, then open:
-   - `https://<username>.github.io/<repo>/`
 
 ---
 
