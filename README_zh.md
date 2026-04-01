@@ -1,5 +1,7 @@
 ## Knowledge Graph Builder（知识图谱构建系统）
 
+[中文](README.md) | [English](README_EN.md)
+
 把“教材章节数据（CSV）+ 目录（TOC）”变成**可评测、可微调、可入库（Neo4j）**的课程知识图谱流水线。
 
 <div align="left">

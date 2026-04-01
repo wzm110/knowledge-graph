@@ -1,6 +1,8 @@
-## Knowledge Graph Builder
+## Knowledge Graph Builder（知识图谱构建系统）
 
-Build a **course knowledge graph** from textbook chapters (CSV) and TOC files, then **evaluate**, **refine**, and optionally **import to Neo4j**.
+[中文](README.md) | [English](README_EN.md)
+
+把“教材章节数据（CSV）+ 目录（TOC）”变成**可评测、可微调、可入库（Neo4j）**的课程知识图谱流水线。
 
 <div align="left">
   <a href="./LICENSE">
@@ -14,59 +16,60 @@ Build a **course knowledge graph** from textbook chapters (CSV) and TOC files, t
   </a>
 </div>
 
-### Pipeline at a glance
+### 一张图看懂全流程
 
-![Knowledge Graph Pipeline](docs/architecture.png)
+![知识图谱构建流水线架构图](docs/architecture.png)
 
-### Interactive preview (GitHub Pages)
+### 可交互预览（GitHub Pages）
 
-GitHub README can’t run JavaScript. The full interactive matrix lives on GitHub Pages. Enable Pages, then click the preview:
+README 里不能运行 JS，所以完整版交互放在 GitHub Pages。启用后点击下图进入 Demo：
 
 [![Interactive Matrix Demo](docs/images/demo_preview.gif)](docs/index.html)
 
 ---
 
-## Overview
+## Overview（这项目能做什么）
 
-What you get:
+你会得到：
 
-- Multi-level nodes: **L1/L2/L3/L4** knowledge points
-- Relations like `contains` / `prerequisite`
-- Traceable evaluation artifacts per run (`run_id`) + per-cluster markdown reports
-- A refinement loop: **MERGE / ADD / DELETE** (+ rollback safety)
-- Optional Neo4j import (**knowledge-point graph only**, filters `has_resource`)
+- **知识图谱数据**：L1/L2/L3/L4 知识点 + `contains` / `prerequisite` 等关系
+- **评测报告（可追溯）**：每次评测都有 `run_id` 归档，并输出簇级报告（`clusters/*.md`）
+- **微调闭环**：基于评测建议执行 **MERGE / ADD / DELETE**，并带回滚保护
+- **Neo4j 入库（可选）**：当前默认只入库“知识点图”（过滤 `has_resource`）
 
 ---
 
-## Quickstart
+## Quickstart（3 分钟跑起来）
 
-⚠️ **Warning**: LLM extraction/evaluation can be costly. Start small, verify outputs, then scale up.
+⚠️ **提醒**：LLM 抽取/评测/微调可能有成本，请先用小数据验证，再扩大规模。
 
-### Requirements
+### 1) 环境要求
 
 - Python **3.10+**
-- Optional: Neo4j **5.x** (only needed for Step 8)
+- （可选）Neo4j **5.x**（仅 Step 8 需要）
 
-### Install
+### 2) 安装依赖（Poetry）
 
 ```bash
 poetry install
 ```
 
-### Configure (local config is not committed)
+### 3) 准备配置（本地配置不提交）
 
-The pipeline loads `config/default.yaml`. Recommended:
+本仓库默认读取 `config/default.yaml`（`knowledge_graph/utils/config.py`）。  
+推荐做法：
 
-- Copy `config/default.example.yaml` → `config/default.yaml`
-- Fill `api_key / api_base / model` in your local `config/default.yaml`
+- 复制示例：`config/default.example.yaml` → `config/default.yaml`
+- 在本地 `config/default.yaml` 填入你自己的 `api_key / api_base / model`
+- **不要提交 `config/`**（仓库已在 `.gitignore` 忽略 `config/`）
 
-### Run full pipeline
+### 4) 一键跑全流程
 
 ```bash
 poetry run python -m knowledge_graph.pipeline
 ```
 
-Equivalent entrypoint:
+等价入口（你也可以用这个）：
 
 ```bash
 poetry run python -m knowledge_graph
@@ -74,24 +77,26 @@ poetry run python -m knowledge_graph
 
 ---
 
-## Enable GitHub Pages (to run the demo)
+## 启用 GitHub Pages（让 Demo 真正可交互）
 
-1. Repo → **Settings** → **Pages**
-2. Build and deployment
-   - Source: **Deploy from a branch**
-   - Branch: **main**, Folder: **/docs**
-3. Wait ~1–2 minutes, then open:
-   - `https://<username>.github.io/<repo>/`
+1. GitHub 仓库 → **Settings** → **Pages**
+2. **Build and deployment**
+   - Source 选 **Deploy from a branch**
+   - Branch 选 **main**，Folder 选 **/docs**
+3. 保存后等待 1-2 分钟，访问你的 Pages 地址：
+   - `https://<你的用户名>.github.io/<仓库名>/`
 
 ---
 
-## Common commands
+## 常用命令（Copy & Paste）
 
-### Run a single step (debug-friendly)
+### 只跑某一步（调试专用）
 
-`step` is a positional argument (see `knowledge_graph/__main__.py`):
+`step` 是位置参数（见 `knowledge_graph/__main__.py`）：
 
 - `extract_l1|validate_l1|extract_l1_rels|extract|vectorize|calibrate|evaluate|build`
+
+示例：
 
 ```bash
 poetry run python -m knowledge_graph extract
@@ -99,17 +104,17 @@ poetry run python -m knowledge_graph evaluate
 poetry run python -m knowledge_graph build
 ```
 
-### Two important loop knobs
+### 两个最常用的循环开关
 
 ```bash
-# L1 extraction↔validation max loops (default: 3)
+# L1 提取↔验证最大循环次数（默认 3）
 poetry run python -m knowledge_graph full --max-loops 3
 
-# evaluation↔refinement max loops (default: 5)
+# 评测↔微调最大循环次数（默认 5）
 poetry run python -m knowledge_graph full --max-eval-loops 2
 ```
 
-### Incremental mode (only new input files)
+### 增量模式（只处理新增输入文件）
 
 ```bash
 poetry run python -m knowledge_graph full --incremental
@@ -117,107 +122,118 @@ poetry run python -m knowledge_graph full --incremental
 
 ---
 
-## Outputs (where to look)
+## 输出产物（去哪看结果）
 
-- `data/output/stage1_entities.parquet` (Step 1–2)
-- `data/output/stage2_relationships.parquet` (Step 3)
-- `data/output/stage3_{entities,relationships,resources}.parquet` (Step 4)
-- `data/output/calibrated_{entities,relationships}.parquet` (Step 6; may be overwritten by 6.5 / 7.5)
-- `data/output/evaluation/<run_id>/*` + `data/output/evaluation/latest.json` (Step 7)
-- `data/output/final_evaluation/**` (latest evaluation sync, incl. `clusters/*.md`)
-
----
-
-## Repository guidance
-
-- Flow overview + loops: `docs/项目流程/00_总体说明与全架构图.md`
-- Implementation-level doc: `docs/项目流程/11_全流程细节级实现说明.md`
-- Doc↔code map: `docs/文档与代码对照表.md`
-- Development: `docs/development.md`
+- `data/output/stage1_entities.parquet`：Step 1–2
+- `data/output/stage2_relationships.parquet`：Step 3
+- `data/output/stage3_{entities,relationships,resources}.parquet`：Step 4
+- `data/output/calibrated_{entities,relationships}.parquet`：Step 6（随后 6.5 / 7.5 可能覆盖更新）
+- `data/output/evaluation/<run_id>/*` + `data/output/evaluation/latest.json`：Step 7
+- `data/output/final_evaluation/**`：最新评估同步输出（含 `clusters/*.md`）
 
 ---
 
-## Important boundaries (easy to misunderstand)
+## 仓库指引（读文档的正确方式）
 
-- Vectorization (Step 5) embeds **knowledge points only** (resources are ignored).
-- Evaluation (Step 7) filters `has_resource` (resources do not participate).
-- Neo4j import (Step 8) imports **knowledge points graph only** (filters `has_resource`).
-
----
-
-## Features
-
-### Core capabilities
-
-- **L1 extraction + validation loop** (`--max-loops`)
-- **L1 prerequisite relation mining**
-- **Entity/relationship/resource extraction** from chapter CSVs (resources are stored separately)
-- **Vector store support** (currently embeds **knowledge points only**)
-- **Calibration & cleanup** (dedupe / hierarchy / relation sanity checks)
-- **Evaluation + refinement loop** (**MERGE / ADD / DELETE**) with traceable artifacts per run
-- **Optional Neo4j import** (knowledge-point graph only, filters `has_resource`)
-
-### Engineering experience
-
-- **Run artifacts are traceable**: `data/output/evaluation/<run_id>/*` + `final_evaluation/**`
-- **Incremental processing**: `--incremental` with `data/processed_files.json`
-- **Stage-by-stage Parquet outputs** for debugging and resuming
+- 流程总览与循环：`docs/项目流程/00_总体说明与全架构图.md`
+- 细节级对齐代码：`docs/项目流程/11_全流程细节级实现说明.md`
+- 文档与代码对照：`docs/文档与代码对照表.md`
+- 本地开发指南：`docs/development.md`
 
 ---
 
-## Repository structure
+## 重要边界（最容易误解的点）
+
+- Step 5 向量化：当前只向量化**知识点**（资源不参与）
+- Step 7 评测：会过滤 `has_resource`（资源不参与评测）
+- Step 8 入库：会过滤 `has_resource`（当前只入库知识点图）
+
+---
+
+## FAQ（常见问题）
+
+### 为什么我看不到 resources 入库或参与评测？
+
+当前实现中：
+
+- Step4 会落盘 `stage3_resources.parquet`
+- 但 Step7/Step8 会过滤 `has_resource`，只处理知识点图（见 `knowledge_graph/agents/evaluation.py`、`knowledge_graph/agents/graph_builder.py`）
+
+---
+
+## 功能特性
+
+### 🚀 核心能力
+
+- **L1 知识点提取 + 验证回环**：从 TOC/章节信息抽取 L1，并可多轮迭代修正（`--max-loops`）
+- **L1 前置关系**：在 L1 粒度上推断学习依赖关系
+- **实体与关系抽取**：从教材章节抽取 L2/L3、关系与资源（资源单独落盘）
+- **向量检索底座**：将知识点写入向量库，支持后续语义检索（当前仅向量化知识点）
+- **校准与清洗**：去重、层级归属、关系合法性校验，输出可评测/可入库基线
+- **评测 + 微调闭环**：产出可执行建议并落盘归档，微调支持 **MERGE/ADD/DELETE**
+- **Neo4j 图谱**：将最终知识点图写入 Neo4j（当前过滤 `has_resource`）
+
+### ⚡ 工程体验
+
+- **可追溯评测产物**：每次评测都有 `run_id` 目录归档 + `final_evaluation/**` 最新同步
+- **增量处理**：只处理新增输入文件（依赖 `data/processed_files.json`）
+- **分阶段 Parquet 产物**：便于断点调试与定位问题
+
+---
+
+## 项目结构
 
 ```text
 graph/
-├── config/                 # local config (ignored, not committed)
+├── config/                 # 本地配置（仓库默认忽略，不提交）
 ├── data/
-│   ├── input/              # inputs (chapter CSVs, TOC files, etc.)
-│   └── output/             # outputs (ignored)
-├── docs/                   # docs + GitHub Pages demo (/docs)
-├── prompts/                # prompt templates
+│   ├── input/              # 输入（教材 csv、TOC 等）
+│   └── output/             # 输出（parquet、评测归档等，已忽略不提交）
+├── docs/                   # 文档 + GitHub Pages Demo（/docs）
+├── prompts/                # 提示词
 ├── knowledge_graph/
-│   ├── __main__.py         # CLI entry (single steps / args)
-│   ├── pipeline.py         # main pipeline + loop controllers
-│   ├── agents/             # agents (1-8 + 6.5 + 7.5)
-│   └── utils/              # config/logging/LLM/vector db helpers
-└── tests/                  # tests
+│   ├── __main__.py         # CLI 入口（单步/参数）
+│   ├── pipeline.py         # 主流程与循环控制
+│   ├── agents/             # 各步骤 Agent（1-8 + 6.5 + 7.5）
+│   └── utils/              # 配置/日志/LLM/向量库工具
+└── tests/                  # 测试
 ```
 
 ---
 
-## Data flow (aligned with current code)
+## 数据流（按当前实现对齐）
 
 ```text
-Inputs
+输入数据
   │
-  ├─→ data/input/Table_of_Contents/*.txt   # TOC files
-  └─→ data/input/*.csv                    # chapter content (excluding *目录.csv)
+  ├─→ data/input/Table_of_Contents/*.txt   # 目录（TOC）
+  └─→ data/input/*.csv                    # 章节内容（排除 *目录.csv）
           │
           ▼
-Step 1–2: L1 extraction + validation loop
+Step 1–2: L1 提取 + 验证回环
           │
           ▼ data/output/stage1_entities.parquet
-Step 3: L1 prerequisite relations
+Step 3: L1 前置关系
           │
           ▼ data/output/stage2_relationships.parquet
-Step 4: entity / relationship / resource extraction
+Step 4: 实体/关系/资源抽取（L2/L3）
           │
           ▼ data/output/stage3_{entities,relationships,resources}.parquet
-Step 5–6: vectorize (KPs only) + calibrate
+Step 5–6: 向量化（仅知识点） + 校准（去重/层级/关系校验）
           │
           ▼ data/output/calibrated_{entities,relationships}.parquet
-Step 6.5: recluster (aggregate L2, sink levels to L3/L4)
+Step 6.5: 重聚合（按 L1 聚合 L2，下沉 L2→L3、L3→L4）
           │
-Step 7 ↔ 7.5: evaluate ↔ refine (MERGE/ADD/DELETE)
+Step 7 ↔ 7.5: 评测 ↔ 微调（MERGE/ADD/DELETE）
           │
-Step 8: Neo4j import (KPs only, filters has_resource)
+Step 8: Neo4j 入库（知识点图，过滤 has_resource）
 ```
 
 ---
 
-## What’s new in this update
+## 本次更新说明（你会感知到的变化）
 
-- **Better onboarding**: README now links to a real interactive demo (README preview + full GitHub Pages site)
-- **Safe example config**: added `config/default.example.yaml` (commented template, no secrets)
-- **Docs are aligned with code**: `docs/**` updated to match the current pipeline (6.5/7.5, evaluation artifacts, resource boundaries)
+- **README 更可上手**：补齐 GitHub Pages 交互 Demo（README 预览 + /docs 站点）
+- **新增示例配置**：`config/default.example.yaml`（不含密钥，逐项注释），本地复制为 `config/default.yaml` 使用
+- **文档全面对齐代码**：`docs/**` 中 6.5/7.5、评测产物路径、资源边界等与实际实现保持一致
 
