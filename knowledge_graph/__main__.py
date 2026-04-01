@@ -33,6 +33,10 @@ def main():
                        help='测试模式：仅处理2个章节用于快速验证')
     parser.add_argument('--max-loops', type=int, default=3,
                        help='最大验证循环次数 (默认: 3)')
+    parser.add_argument('--max-eval-loops', type=int, default=5,
+                       help='最大评估-微调循环次数 (默认: 5)')
+    parser.add_argument('--full-refresh-l1', action='store_true',
+                       help='全量重跑 L1 抽取与验证（即使已存在 stage1_entities.parquet 也不跳过）')
     args = parser.parse_args()
 
     os.makedirs('data/output', exist_ok=True)
@@ -42,7 +46,13 @@ def main():
 
     if args.step == 'full':
         from knowledge_graph.pipeline import run_full_pipeline
-        run_full_pipeline(config, max_loops=args.max_loops, test_mode=args.test)
+        run_full_pipeline(
+            config,
+            max_loops=args.max_loops,
+            max_eval_loops=args.max_eval_loops,
+            test_mode=args.test,
+            skip_l1_if_exists=not args.full_refresh_l1
+        )
     elif args.step == 'extract_l1':
         from knowledge_graph.agents.l1_extractor import create_l1_extractor
         agent = create_l1_extractor(config)

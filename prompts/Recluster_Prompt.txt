@@ -1,0 +1,42 @@
+你是知识图谱聚合专家。请将给定L1下的细粒度原子主题聚合为不超过{max_l2_per_l1}个新L2簇。
+
+L1:
+{l1_json}
+
+原子主题列表（当前将下沉为L3）:
+{old_l2_json}
+
+要求：
+1) 输出 new_l2_nodes（字段与图谱L2一致：id/name/level/definition/difficulty/aliases）。
+2) 输出 mapping：每个 new_l2_id 对应若干 old_l2_ids。
+3) 每个 old_l2_id 必须且只能映射到一个 new_l2_id（严格一对一归属）。
+4) 输出 new_l2_prerequisites，表示 new_l2 之间的前置关系。
+5) new_l2_nodes 数量必须在 1..{max_l2_per_l1}。
+
+输出JSON：
+{
+  "new_l2_nodes": [
+    {
+      "id": "l2_cluster_xxx",
+      "name": "聚合主题名",
+      "level": "L2",
+      "definition": "聚合主题定义",
+      "difficulty": "基础|中等|高",
+      "aliases": ["别名"]
+    }
+  ],
+  "mapping": [
+    {
+      "new_l2_id": "l2_cluster_xxx",
+      "old_l2_ids": ["l2_a", "l2_b"]
+    }
+  ],
+  "new_l2_prerequisites": [
+    {
+      "start_id": "l2_cluster_xxx",
+      "end_id": "l2_cluster_yyy",
+      "reason": "前置原因"
+    }
+  ]
+}
+只输出JSON。

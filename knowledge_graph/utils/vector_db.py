@@ -6,6 +6,8 @@
 """
 
 import os
+import json
+import hashlib
 import lancedb
 import pandas as pd
 import numpy as np
@@ -14,6 +16,9 @@ import openai
 from knowledge_graph.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+EMBEDDING_CACHE_FILE = "data/output/embedding_cache.json"
+
 
 class VectorDBManager:
     def __init__(self, config, db_path="data/output/lancedb", force_recreate=False):
@@ -24,6 +29,33 @@ class VectorDBManager:
         self.db = self._connect_db()
         self.table = self._get_or_create_table(force_recreate=force_recreate)
         self._openai_client = None
+        self._embedding_cache = self._load_embedding_cache()
+    
+    def _load_embedding_cache(self):
+        """加载embedding缓存"""
+        if os.path.exists(EMBEDDING_CACHE_FILE):
+            try:
+                with open(EMBEDDING_CACHE_FILE, 'r', encoding='utf-8') as f:
+                    cache = json.load(f)
+                    logger.info(f"已加载embedding缓存，共 {len(cache)} 条记录")
+                    return cache
+            except Exception as e:
+                logger.warning(f"加载embedding缓存失败: {e}")
+        return {}
+    
+    def _save_embedding_cache(self):
+        """保存embedding缓存到文件"""
+        try:
+            os.makedirs(os.path.dirname(EMBEDDING_CACHE_FILE), exist_ok=True)
+            with open(EMBEDDING_CACHE_FILE, 'w', encoding='utf-8') as f:
+                json.dump(self._embedding_cache, f, ensure_ascii=False, indent=2)
+            logger.info(f"已保存embedding缓存，共 {len(self._embedding_cache)} 条记录")
+        except Exception as e:
+            logger.warning(f"保存embedding缓存失败: {e}")
+    
+    def _get_text_hash(self, text):
+        """获取文本的哈希值作为缓存键"""
+        return hashlib.md5(text.encode('utf-8')).hexdigest()
     
     def _get_openai_client(self):
         """获取或创建OpenAI客户端"""
@@ -100,9 +132,15 @@ class VectorDBManager:
             raise
     
     def _get_embedding(self, text):
-        """获取文本的embedding向量"""
+        """获取文本的embedding向量（带缓存）"""
         if not text or not text.strip():
             return None
+        
+        text_hash = self._get_text_hash(text)
+        
+        if text_hash in self._embedding_cache:
+            logger.debug(f"从缓存获取embedding: {text[:20]}...")
+            return self._embedding_cache[text_hash]
         
         try:
             client = self._get_openai_client()
@@ -115,41 +153,65 @@ class VectorDBManager:
             embedding = response.data[0].embedding
             embedding_dim = len(embedding)
             logger.debug(f"成功生成embedding，维度: {embedding_dim}")
+            
+            self._embedding_cache[text_hash] = embedding
+            
             return embedding
         except Exception as e:
             logger.error(f"生成embedding失败: {e}")
             return None
     
     def _get_embeddings_batch(self, texts):
-        """批量获取embedding向量"""
+        """批量获取embedding向量（带缓存）"""
         if not texts:
             return []
         
-        try:
-            client = self._get_openai_client()
-            
-            batch_size = self.embedding_config.get('batch_size', 10)
-            embeddings = []
-            
-            for i in range(0, len(texts), batch_size):
-                batch = texts[i:i + batch_size]
-                batch = [t.strip() if t and t.strip() else " " for t in batch]
+        embeddings = [None] * len(texts)
+        texts_to_embed = []
+        
+        for idx, text in enumerate(texts):
+            text_hash = self._get_text_hash(text)
+            if text_hash in self._embedding_cache:
+                embeddings[idx] = self._embedding_cache[text_hash]
+            else:
+                texts_to_embed.append((idx, text))
+        
+        if texts_to_embed:
+            try:
+                client = self._get_openai_client()
                 
-                response = client.embeddings.create(
-                    model=self.embedding_config['model'],
-                    input=batch
-                )
+                batch_size = self.embedding_config.get('batch_size', 10)
                 
-                for item in response.data:
-                    embeddings.append(item.embedding)
+                for i in range(0, len(texts_to_embed), batch_size):
+                    batch_info = texts_to_embed[i:i + batch_size]
+                    batch_texts = [t[1] for t in batch_info]
+                    batch_texts = [t.strip() if t and t.strip() else " " for t in batch_texts]
+                    
+                    response = client.embeddings.create(
+                        model=self.embedding_config['model'],
+                        input=batch_texts
+                    )
+                    
+                    for j, item in enumerate(response.data):
+                        emb = item.embedding
+                        original_idx = batch_info[j][0]
+                        embeddings[original_idx] = emb
+                        
+                        original_text = batch_info[j][1]
+                        text_hash = self._get_text_hash(original_text)
+                        self._embedding_cache[text_hash] = emb
+                    
+                    logger.debug(f"已处理 {min(i + batch_size, len(texts_to_embed))}/{len(texts_to_embed)} 个文本")
                 
-                logger.debug(f"已处理 {min(i + batch_size, len(texts))}/{len(texts)} 个文本")
-            
-            logger.info(f"批量生成embedding完成，共 {len(embeddings)} 个")
-            return embeddings
-        except Exception as e:
-            logger.error(f"批量生成embedding失败: {e}")
-            return [None] * len(texts)
+                logger.info(f"批量生成embedding完成，共 {len(texts_to_embed)} 个新文本")
+                
+                self._save_embedding_cache()
+                
+            except Exception as e:
+                logger.error(f"批量生成embedding失败: {e}")
+                return [None] * len(texts)
+        
+        return embeddings
     
     def add_entities(self, entities):
         """添加实体到向量数据库"""
@@ -332,6 +394,26 @@ class VectorDBManager:
             logger.info("向量数据库连接已关闭")
         except Exception as e:
             logger.error(f"关闭向量数据库连接失败: {e}")
+
+    def get_embedding_by_id(self, entity_id: str):
+        """根据实体ID获取其embedding"""
+        try:
+            df = self.table.to_pandas()
+            if df.shape[0] == 0:
+                return None
+            
+            row = df[df['id'] == entity_id]
+            if row.empty:
+                return None
+            
+            row = row.iloc[0]
+            name_emb = row.get('name_embedding')
+            if name_emb:
+                return list(name_emb)
+            return None
+        except Exception as e:
+            logger.warning(f"获取embedding失败: {e}")
+            return None
 
 
 def string_similarity(str1, str2):

@@ -1,0 +1,74 @@
+你是知识图谱微调专家。根据评估报告中的建议和当前图结构，输出可执行的微调动作列表（JSON），用于自动修复图谱。
+
+字段语义见 `docs/图谱微调操作规范.md`。
+
+## 评测来源与允许的动作
+
+- **全局评测**只会产生：`DELETE`（`delete_mode=isolated_batch`，删全部孤立节点）和 `ADD`（`parent_id` 为 **L1 id**，补 L2）。
+- **L1 簇评测**会产生：`ADD`（`parent_id` 为 **L2 id**，补 L3）、`MERGE`（`keep_id`+`remove_id`，仅 L2 或 L3 两点）、`DELETE`（`target_id` 单点删除）。
+- **禁止**输出「L1 下过载压 L2 数量」类 MERGE；下列 overloaded_json **仅供信息**，不得据此编造 L1 级合并动作。
+
+## 评估建议汇总（含 source=L1簇:… 的项来自簇评测）
+{high_level_suggestions}
+
+## 稀疏 L1 提示（ADD 时可参考）
+{sparse_json}
+
+## L1 超过 10 个 L2 的主题（仅信息，不自动生成 MERGE）
+{overloaded_json}
+
+## 当前图谱 L1 节点目录（ADD 父为 L1 时 parent_id 须从中复制 id 与 name 对照）
+{l1_catalog_json}
+
+## 本批评估建议涉及的节点（**不全量列出 L2**；仅含上表建议中出现的 id；MERGE/DELETE/ADD 的 id 须与此处 id 一致，name 供人工核对）
+{suggestion_nodes_catalog_json}
+
+## 孤立节点候选（DELETE 批量 = 删除下列全部孤立 id）
+{isolated_json}
+
+## 输出 JSON 格式（仅输出 JSON，不要 markdown 围栏或解释）
+
+**每条 action 须 id 与 name 成对**（name 与上文目录或建议中的名称一致，便于核对；执行以 id 为准）。
+
+结构示例（字段名必须一致）：
+{
+  "actions": [
+    {
+      "type": "MERGE",
+      "keep_id": "图中保留节点 id",
+      "keep_name": "与 keep_id 对应的知识点名称",
+      "remove_id": "被合并移除节点 id",
+      "remove_name": "与 remove_id 对应的知识点名称",
+      "reason": "…"
+    },
+    {
+      "type": "ADD",
+      "parent_id": "父节点 id（L1 或 L2）",
+      "parent_name": "与 parent_id 对应的知识点名称",
+      "focus": "可选，子方向提示",
+      "reason": "…"
+    },
+    {
+      "type": "DELETE",
+      "delete_mode": "isolated_batch",
+      "target_id": "",
+      "target_name": "",
+      "reason": "…"
+    },
+    {
+      "type": "DELETE",
+      "delete_mode": "single",
+      "target_id": "待删节点 id",
+      "target_name": "与 target_id 对应的知识点名称",
+      "reason": "…"
+    }
+  ]
+}
+
+## 约束（必须遵守）
+
+- type 只能是 "MERGE"、"ADD"、"DELETE"。
+- **MERGE**：**keep_id + keep_name、remove_id + remove_name** 必填（id 图中已存在且不同）；或将保留填 **target_id**、移除填 **source_id**（与上等价，name 仍建议填写）。
+- **ADD**：**parent_id + parent_name** 必填，且与目录一致；由父层级决定下游生成 L2 或 L3。
+- **DELETE**：**isolated_batch** 至多 1 条，`target_id`/`target_name` 可空；**single** 须 **target_id + target_name**。
+- MERGE+ADD 总数不超过 {max_actions}（不含 DELETE）。

@@ -68,6 +68,3 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-v --cov=knowledge_graph --cov-report=term-missing"
-
-[tool.poetry]
-group = { dev = ["pytest", "pytest-cov"] }

@@ -35,18 +35,22 @@ ENV/
 .DS_Store
 Thumbs.db
 
+# Local / reference docs (do not commit)
+README_示例.md
+
 # Project specific
 data/input/
-data/output/*.parquet
-data/output/*.csv
-data/output/*.json
-data/output/*.yaml
+data/output/
 data/output/llm_cache/
 data/output/lancedb/
 data/output/agent_state/
+data/processed_files.json
 logs/
 *.log
 
 # Environment
 .env
 .env.local
+
+# Config with secrets
+config/

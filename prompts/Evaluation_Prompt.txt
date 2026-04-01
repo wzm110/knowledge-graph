@@ -1,44 +1,135 @@
-你是一名专业的知识图谱评估专家，擅长评估知识图谱的质量和完整性。
+你是一名专业的知识图谱评估专家，擅长评估知识图谱质量、定位问题根因，并给出可执行修复建议。
 
-请对以下知识图谱进行全面的质量评估：
+请对以下知识图谱进行全面评估，并特别注意：当某些主题稀疏时，需要判断是“源数据覆盖不足”还是“抽取/校准质量问题”。
+
+## L1 节点目录（全局评测输出 ADD 时，`parent_id` 必须从中逐字复制 id）
+{l1_id_catalog}
 
 ## 知识图谱概览
 
-### L1知识点列表：
+### L1知识点名称列表：
 {l1_list}
+
+### L1主题层级分布：
+{l1_distribution}
 
 ### 实体统计：
 - 知识点总数：{kp_count}
 - L1知识点：{l1_count}
 - L2知识点：{l2_count}
 - L3知识点：{l3_count}
-- 资源总数：{res_count}
+- 孤立节点数：{isolated_count}
 
 ### 关系统计：
 - 关系总数：{rel_count}
 - 关系类型分布：{rel_types}
 
-## 评估维度
+## 图谱结构分析
 
-1. **完整性(Completeness)**: 知识点覆盖是否全面？
-2. **准确性(Accuracy)**: 知识点定义和关系是否准确？
-3. **一致性(Consistency)**: 层级结构是否清晰一致？
-4. **可用性(Usability)**: 能否有效支撑学习路径规划？
+### 基础结构指标：
+{graph_structure}
+
+### 层级结构质量：
+{hierarchy_quality}
+
+### 关系质量分析：
+{relation_quality}
+
+### 源数据覆盖证据：
+{source_coverage}
+
+## 评估维度（按知识图谱评估规则）
+
+请根据以下维度进行评估：
+
+### 一、结构维度评估
+
+1. **完整性(Completeness)**: 知识点覆盖是否全面？是否有足够的层级深度？
+2. **层级结构(Hierarchy Structure)**: 层级是否完整？L2知识点是否有L1父节点？L3知识点是否有L2父节点？
+3. **连通性(Connectivity)**: 图谱连通程度如何？是否存在大量孤立节点？
+4. **关系密度(Relation Density)**: 知识点之间的连接是否充分？平均度数如何？
+
+### 二、语义维度评估
+
+5. **关系完备性(Relation Completeness)**: 两种核心关系类型（prerequisite前置关系、contains包含关系）是否覆盖充分、分布合理？
+6. **学习路径可用性(Learning Path Usability)**: prerequisite关系是否足够支撑学习路径规划？是否能形成从基础到高级的合理路径？
+
+### 三、事实维度评估
+
+7. **知识实用性(Practicality)**: 在不考虑外部资源的前提下，仅从知识点本身与结构出发，评估其对实际学习/教学/应用场景的支持度（例如：定义是否清晰、是否覆盖典型任务、是否便于组织课程和练习）。
+
+## 评分与通过判定规则（必须遵守）
+
+1. 先给7个维度打分（1-10）。
+2. 再给 overall_score（1-10，可为小数）。
+3. 给出 is_passed（true/false）：
+   - 仅当 overall_score > 7.5 时，才可判定为 true；
+   - 当存在结构性阻断问题（如大量断层、严重孤立、核心主题缺失且并非源数据问题）时，必须 false；
+   - 若主要问题由"源数据覆盖不足"导致，且图结构本身基本健康，可 true 但需写明 pass_reason 与后续建议。
+4. 对每个关键问题给出根因分类：source_data_gap / extraction_quality / calibration_quality / unknown。
+
+## 全局评测 `adjustment_suggestions` 约束（必须遵守）
+
+**本阶段只允许两类操作**（L2/L3 合并、单点删除、向 L2 下补 L3 等由 **L1 簇评测** 单独输出，你不得在这里输出）：
+
+1. **DELETE**：仅**批量删除当前全部孤立节点**。
+   - 设置 `delete_mode="isolated_batch"`，`target_id` 可留空或填 `isolated_nodes_batch`。
+2. **ADD**：仅**在某一 L1 下补充缺失的 L2**。
+   - 必须设置 `parent_id`、`parent_name`，与 **L1 节点目录** 中该条的 `id`、`name` 一致（id 须逐字复制）。
+   - 可选 `focus` 描述希望补充的 L2 子方向。
+   - **不要**因为“L2 数量 &lt; 10 / 有剩余槽位”就建议 ADD。ADD 的触发条件必须是：该 L1 在关键子主题上存在**明确覆盖缺口**，且新增少量 L2 能显著提升覆盖与结构合理性。
+   - 若覆盖已充分，即使 L2 数量 &lt; 10，也应返回**不需要 ADD**（或仅给出 `improvement_suggestions` 的文字建议）。
+   - 若建议 ADD，请遵循“**宁少勿滥**”：优先 1-2 条最关键缺口，而不是“补满到 10”。
+
+**禁止**：`MERGE`；单点 `DELETE`；父节点为 L2 的 `ADD`。
+
+课程结构硬约束：每个L1下L2最多10个。
 
 ## 输出格式（JSON）
+
 ```json
 {
     "overall_score": 1-10,
+    "is_passed": true/false,
+    "pass_reason": "通过/不通过的简要原因",
+    "blocking_issues": ["阻断问题1", "阻断问题2"],
     "dimensions": {
         "completeness": {"score": 1-10, "feedback": "评价"},
-        "accuracy": {"score": 1-10, "feedback": "评价"},
-        "consistency": {"score": 1-10, "feedback": "评价"},
-        "usability": {"score": 1-10, "feedback": "评价"}
+        "hierarchy_structure": {"score": 1-10, "feedback": "评价"},
+        "connectivity": {"score": 1-10, "feedback": "评价"},
+        "relation_density": {"score": 1-10, "feedback": "评价"},
+        "relation_completeness": {"score": 1-10, "feedback": "评价"},
+        "learning_path_usability": {"score": 1-10, "feedback": "评价"},
+        "practicality": {"score": 1-10, "feedback": "评价"}
     },
     "strengths": ["优点1", "优点2"],
     "weaknesses": ["问题1", "问题2"],
-    "improvement_suggestions": ["建议1", "建议2"]
+    "improvement_suggestions": ["建议1", "建议2"],
+    "root_cause_analysis": [
+        {
+            "issue": "问题描述",
+            "cause_type": "source_data_gap|extraction_quality|calibration_quality|unknown",
+            "evidence": "证据"
+        }
+    ],
+    "adjustment_suggestions": [
+        {
+            "action": "DELETE",
+            "delete_mode": "isolated_batch",
+            "target_id": "",
+            "priority": "high|medium|low",
+            "reason": "原因"
+        },
+        {
+            "action": "ADD",
+            "parent_id": "从 l1_id_catalog 复制的 L1 id",
+            "parent_name": "与 parent_id 对应的 L1 名称（从目录复制）",
+            "focus": "可选",
+            "priority": "high|medium|low",
+            "reason": "该 L1 存在关键子主题缺口；新增该方向的少量 L2 能显著提升覆盖（不是为了补满数量上限）。"
+        }
+    ]
 }
 ```
 
-注意：只输出JSON，不要有其他内容
+说明：只输出JSON，不要有其他内容。字段语义见 `docs/图谱微调操作规范.md`。

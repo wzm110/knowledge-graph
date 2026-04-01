@@ -4,6 +4,7 @@
 
 import yaml
 import os
+import re
 import pandas as pd
 
 from knowledge_graph.utils.logger import get_logger
@@ -11,11 +12,29 @@ from knowledge_graph.utils.logger import get_logger
 logger = get_logger(__name__)
 
 
+def _expand_env_vars(value):
+    """递归展开环境变量 ${VAR:-default}"""
+    if isinstance(value, str):
+        pattern = r'\$\{([^}:]+)(?::-([^}]*))?\}'
+        def replacer(match):
+            var_name = match.group(1)
+            default_value = match.group(2) or ''
+            return os.environ.get(var_name, default_value)
+        return re.sub(pattern, replacer, value)
+    elif isinstance(value, dict):
+        return {k: _expand_env_vars(v) for k, v in value.items()}
+    elif isinstance(value, list):
+        return [_expand_env_vars(item) for item in value]
+    else:
+        return value
+
+
 def load_config(config_file='config/default.yaml'):
     """Load configuration file."""
     try:
         with open(config_file, 'r', encoding='utf-8') as f:
             config = yaml.safe_load(f)
+        config = _expand_env_vars(config)
         logger.info(f"Loaded config file: {config_file}")
         return config
     except Exception as e:

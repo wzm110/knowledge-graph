@@ -23,17 +23,17 @@ class VectorizationAgent(BaseAgent):
         try:
             from knowledge_graph.utils.vector_db import VectorDBManager
             
+            # 仅向量化知识点；资源仍由 Step4 落盘 stage3_resources，后续独立步骤入图，此处不参与以节省成本
             kps = state.get('knowledge_points', [])
-            resources = state.get('resources', [])
             
-            if not kps and not resources:
-                self.log("没有需要向量化的实体", "warning")
+            if not kps:
+                self.log("没有需要向量化的知识点实体", "warning")
                 state['errors'].append("没有需要向量化的实体")
                 return state
             
-            all_entities = kps + resources
+            all_entities = kps
             
-            self.log(f"正在向量化 {len(all_entities)} 个实体")
+            self.log(f"正在向量化 {len(all_entities)} 个知识点实体（已忽略资源）")
             
             vector_db = VectorDBManager(self.config, force_recreate=True)
             vector_db.add_entities(all_entities)

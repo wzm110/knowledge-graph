@@ -28,26 +28,57 @@ class EntityExtractorAgent(LLMAgent):
         
         csv_files = glob_module.glob(f"{input_dir}/*.csv")
         csv_files = [f for f in csv_files if not f.endswith('目录.csv')]
-        self.log(f"找到 {len(csv_files)} 个CSV文件")
-
+        
+        processed = self.load_processed_files()
+        processed_set = set(processed.get('processed_files', []))
+        
+        new_files = [f for f in csv_files if os.path.basename(f) not in processed_set]
+        
+        self.log(f"找到 {len(csv_files)} 个CSV文件, 其中 {len(new_files)} 个新增")
+        
         import pandas as pd
         data = []
         
         for csv_file in csv_files:
-            self.log(f"  读取: {os.path.basename(csv_file)}")
-            df = pd.read_csv(csv_file, encoding='utf-8-sig')
-            for _, row in df.iterrows():
-                data.append({
-                    'chapter_title': row.get('title', ''),
-                    'text': row.get('text', ''),
-                    'lecture_link': row.get('lecture_link', ''),
-                    'ppt_link': row.get('ppt_link', ''),
-                    'code_link': row.get('code_link', ''),
-                    'video_link': row.get('video_link', '')
-                })
+            file_name = os.path.basename(csv_file)
+            is_new = file_name not in processed_set
+            
+            if is_new:
+                self.log(f"  [新增] {file_name}")
+                df = pd.read_csv(csv_file, encoding='utf-8-sig')
+                for _, row in df.iterrows():
+                    data.append({
+                        'chapter_title': row.get('title', ''),
+                        'text': row.get('text', ''),
+                        'lecture_link': row.get('lecture_link', ''),
+                        'ppt_link': row.get('ppt_link', ''),
+                        'code_link': row.get('code_link', ''),
+                        'video_link': row.get('video_link', ''),
+                        'source_file': file_name,
+                        'is_new': True
+                    })
+            else:
+                self.log(f"  [已处理] {file_name}")
         
-        self.log(f"已加载 {len(data)} 个章节")
+        self.log(f"已加载 {len(data)} 个新增章节")
         return data
+    
+    def load_processed_files(self) -> dict:
+        """加载已处理文件记录"""
+        import json
+        record_file = 'data/processed_files.json'
+        if os.path.exists(record_file):
+            with open(record_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        return {'processed_files': [], 'last_processed': ''}
+    
+    def save_processed_files(self, processed: dict):
+        """保存已处理文件记录"""
+        import json
+        from datetime import datetime
+        processed['last_processed'] = datetime.now().isoformat()
+        with open('data/processed_files.json', 'w', encoding='utf-8') as f:
+            json.dump(processed, f, ensure_ascii=False, indent=2)
 
     def extract_from_chunk(self, text: str, l1_list: list, resource_links: dict) -> dict:
         """从单个文本块提取实体"""
@@ -87,6 +118,7 @@ class EntityExtractorAgent(LLMAgent):
             return state
         
         textbook_data = state.get('textbook_data', [])
+        
         if not textbook_data:
             textbook_data = self.load_textbook_data()
             
@@ -96,6 +128,22 @@ class EntityExtractorAgent(LLMAgent):
                 self.log(f"测试模式：仅处理 {len(textbook_data)} 个章节")
             
             state['textbook_data'] = textbook_data
+        
+        new_chunks = [c for c in textbook_data if c.get('is_new', False)]
+        
+        if not new_chunks:
+            self.log("没有新增章节，跳过实体提取")
+            
+            existing_kps = self.load_parquet('data/output/stage3_entities.parquet')
+            existing_rels = self.load_parquet('data/output/stage3_relationships.parquet')
+            existing_res = self.load_parquet('data/output/stage3_resources.parquet')
+            
+            state['knowledge_points'] = existing_kps or []
+            state['relationships'] = existing_rels or []
+            state['resources'] = existing_res or []
+            state['current_step'] = 'extract_entities'
+            
+            return state
         
         all_kps = []
         all_rels = []
@@ -108,7 +156,10 @@ class EntityExtractorAgent(LLMAgent):
             iterator = textbook_data
         
         for i, chunk in enumerate(iterator):
-            self.log(f"处理章节 {i+1}/{len(textbook_data)}")
+            if not chunk.get('is_new', False):
+                continue
+                
+            self.log(f"处理新增章节 {i+1}/{len(new_chunks)}")
             
             result = self.extract_from_chunk(
                 chunk.get('text', ''),
@@ -144,18 +195,68 @@ class EntityExtractorAgent(LLMAgent):
             if start_id in l1_name_to_id:
                 rel['start_id'] = l1_name_to_id[start_id]
         
-        state['knowledge_points'] = all_kps
-        state['relationships'] = all_rels
-        state['resources'] = all_resources
+        existing_kps = self.load_parquet('data/output/stage3_entities.parquet') or []
+        existing_rels = self.load_parquet('data/output/stage3_relationships.parquet') or []
+        existing_res = self.load_parquet('data/output/stage3_resources.parquet') or []
+        
+        merged_kps = self.merge_entities(existing_kps, all_kps)
+        merged_rels = self.merge_relationships(existing_rels, all_rels)
+        merged_res = self.merge_resources(existing_res, all_resources)
+        
+        new_files = set(c.get('source_file', '') for c in new_chunks)
+        processed = self.load_processed_files()
+        processed['processed_files'] = list(set(processed.get('processed_files', [])) | new_files)
+        self.save_processed_files(processed)
+        
+        state['knowledge_points'] = merged_kps
+        state['relationships'] = merged_rels
+        state['resources'] = merged_res
         state['current_step'] = 'extract_entities'
         
-        self.save_parquet(all_kps, 'data/output/stage3_entities.parquet')
-        self.save_parquet(all_rels, 'data/output/stage3_relationships.parquet')
-        self.save_parquet(all_resources, 'data/output/stage3_resources.parquet')
+        self.save_parquet(merged_kps, 'data/output/stage3_entities.parquet')
+        self.save_parquet(merged_rels, 'data/output/stage3_relationships.parquet')
+        self.save_parquet(merged_res, 'data/output/stage3_resources.parquet')
         
-        self.log(f"已提取: {len(all_kps)} 个知识点, {len(all_rels)} 条关系, {len(all_resources)} 个资源")
+        self.log(f"已提取: 新增 {len(all_kps)} 个知识点, 合并后共 {len(merged_kps)} 个")
         
         return state
+    
+    def merge_entities(self, existing: list, new: list) -> list:
+        """合并新旧实体"""
+        existing_ids = {kp['id'] for kp in existing if kp.get('id')}
+        merged = list(existing)
+        
+        for kp in new:
+            if kp.get('id') not in existing_ids:
+                merged.append(kp)
+        
+        return merged
+    
+    def merge_relationships(self, existing: list, new: list) -> list:
+        """合并新旧关系"""
+        existing_keys = {
+            (r.get('type'), r.get('start_id'), r.get('end_id')) 
+            for r in existing
+        }
+        merged = list(existing)
+        
+        for rel in new:
+            key = (rel.get('type'), rel.get('start_id'), rel.get('end_id'))
+            if key not in existing_keys:
+                merged.append(rel)
+        
+        return merged
+    
+    def merge_resources(self, existing: list, new: list) -> list:
+        """合并新旧资源"""
+        existing_urls = {r.get('url', '') for r in existing if r.get('url')}
+        merged = list(existing)
+        
+        for res in new:
+            if res.get('url') not in existing_urls:
+                merged.append(res)
+        
+        return merged
 
 
 def create_entity_extractor(config: dict) -> EntityExtractorAgent:

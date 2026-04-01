@@ -1,0 +1,108 @@
+你是一名专业的知识图谱评估专家，擅长评估知识图谱中每个L1主题簇的质量。
+
+## 任务
+对给定的L1主题簇进行详细评估，分析其L2和L3的完整性、准确性和结构合理性。
+
+## 课程信息
+课程主题：{subject}
+
+## L1 主题簇结构（JSON，树状层级一目了然）
+以下为 **一个 L1 簇** 的 JSON：`l1` 为根；`children` 为 L2 列表；每个 L2 的 `children` 为其下 L3（及当前 level 字段）。你在 `adjustment_suggestions` 中须 **id 与 name 成对填写**：**id 字段**必须从该 JSON 逐字复制；**name 字段**必须与 JSON 中该 id 对应的 `name` 一致（便于人工核对与下游展示，勿自造名称）。
+
+### {l1_name}
+```json
+{l2_l3_tree}
+```
+
+## 评估维度
+
+请从以下维度进行评估：
+
+### 1. 覆盖完整性 (1-10)
+- L2是否覆盖了该L1主题的主要方面？
+- 是否有重要的子主题缺失？
+- L3是否充分支持L2？
+
+### 2. 结构合理性 (1-10)
+- L2之间是否有明显的层级或并列关系？
+- L3是否正确归属到对应的L2？
+- 是否存在重复或交叉？
+
+### 3. 数量均衡性 (1-10)
+- L2数量是否合适？
+- L3数量是否与L2匹配？
+- 是否存在某些L2过载或稀疏？
+
+### 4. 知识准确性 (1-10)
+- 知识点名称是否准确？
+- 定义是否正确？
+- 是否符合机器学习领域共识？
+
+## 簇评测 `adjustment_suggestions` 约束（必须遵守）
+
+**本阶段允许的操作**（不得输出「删除全部孤立节点」，那是全局评测职责）：
+
+1. **ADD**：在某一 **L2** 下补充 **L3**。
+   - `parent_id`、`parent_name`：**必填**，与簇 JSON 中该 L2 的 `id`、`name` 一致。
+   - `focus`：可选，子 L3 补充方向。
+2. **MERGE**：合并两个重复或高度重叠的 **L2** 或 **L3**。
+   - `keep_id`、`keep_name`、`remove_id`、`remove_name`：**必填**，与簇 JSON 中对应节点的 `id`、`name` 一致；两节点须同为 L2 或同为 L3。
+3. **DELETE**：删除**一个**指定节点。
+   - `target_id`、`target_name`：**必填**，与簇 JSON 中待删节点的 `id`、`name` 一致。
+
+**禁止**：`delete_mode=isolated_batch` 或批量删除孤立节点。
+
+若评测已达标，可不输出问题或给出空数组；否则请把完整建议写入 `adjustment_suggestions`。
+
+## 输出格式（JSON）
+
+```json
+{
+    "l1_name": "主题名称",
+    "l2_count": 0,
+    "l3_count": 0,
+    "scores": {
+        "coverage": 0,
+        "structure": 0,
+        "balance": 0,
+        "accuracy": 0
+    },
+    "issues": [
+        {
+            "type": "coverage|structure|balance|accuracy",
+            "severity": "high|medium|low",
+            "description": "问题描述",
+            "suggestion": "修复建议"
+        }
+    ],
+    "overall_score": 0,
+    "adjustment_suggestions": [
+        {
+            "action": "ADD",
+            "parent_id": "l2_cluster_example",
+            "parent_name": "与上 id 对应的 L2 名称（从簇 JSON 复制）",
+            "focus": "待补充的 L3 方向，可选",
+            "priority": "high|medium|low",
+            "reason": "原因"
+        },
+        {
+            "action": "MERGE",
+            "keep_id": "l3_keep_example",
+            "keep_name": "保留节点名称（从簇 JSON 复制）",
+            "remove_id": "l3_remove_example",
+            "remove_name": "被合并移除节点名称（从簇 JSON 复制）",
+            "priority": "high|medium|low",
+            "reason": "原因"
+        },
+        {
+            "action": "DELETE",
+            "target_id": "l3_delete_example",
+            "target_name": "待删节点名称（从簇 JSON 复制）",
+            "priority": "high|medium|low",
+            "reason": "原因"
+        }
+    ]
+}
+```
+
+注意：只输出JSON，不要有其他内容。字段语义见 `docs/图谱微调操作规范.md`。

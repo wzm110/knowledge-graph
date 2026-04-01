@@ -84,11 +84,14 @@ L1知识点列表：{l1_list}
 
 ### has_resource（资源关联）关系：
 1. **定义**：表示知识点与资源之间的关联关系
-2. **适用场景**：知识点关联相关的学习资源
-3. **方向**：从知识点指向资源
+2. **适用场景**：仅允许L2知识点关联相关学习资源（禁止L1/L3直接挂资源）
+3. **方向**：从L2知识点指向资源
 4. **提取方法**：
    - 识别资源与知识点的关联
    - 根据资源链接推断关联关系
+5. **严格约束**：
+   - `has_resource.start_id` 必须是本次输出中的 L2 节点ID（`l2_`前缀）
+   - 不要输出 `L1 -> Resource` 或 `L3 -> Resource` 关系
 
 ## 输出格式为JSON对象，包含：
 {
@@ -96,7 +99,7 @@ L1知识点列表：{l1_list}
     "l2_points": [每个L2知识点包含：id、name、level、description、difficulty、aliases],
     "l3_points": [每个L3知识点包含：id、name、level、description、difficulty、aliases],
     "resources": [每个资源包含：id、url、resource_type],
-    "relationships": [每个关系包含：type、start_id、end_id、end_type]
+    "relationships": [每个关系包含：type、start_id、end_id、end_type；其中has_resource仅允许L2作为start_id]
 }
 
 ## 示例
