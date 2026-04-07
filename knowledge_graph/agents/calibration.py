@@ -671,7 +671,13 @@ class CalibrationAgent(LLMAgent):
             self.log(f"无法加载向量数据库，将仅使用字符串相似度: {e}", "warning")
         
         relationships = self.load_all_relationships(state)
-        
+
+        # 校准后关系不需要资源边：直接移除所有 has_resource
+        before_hr = sum(1 for r in relationships if r.get('type') == 'has_resource')
+        if before_hr > 0:
+            relationships = [r for r in relationships if r.get('type') != 'has_resource']
+            self.log(f"校准阶段移除 has_resource：移除 {before_hr} 条", "warning")
+
         kps, relationships = self.deduplicate_with_similarity(kps, relationships, vector_db)
         
         kps = self.assign_hierarchy(kps, l1_list, relationships)

@@ -5,6 +5,9 @@
 把“教材章节数据（CSV）+ 目录（TOC）”变成**可评测、可微调、可入库（Neo4j）**的课程知识图谱流水线。
 
 <div align="left">
+  <a href="https://github.com/wzm110/knowledge-graph/actions/workflows/ci.yml">
+    <img alt="CI" src="https://github.com/wzm110/knowledge-graph/actions/workflows/ci.yml/badge.svg">
+  </a>
   <a href="./LICENSE">
     <img alt="License" src="https://img.shields.io/badge/license-MIT-blue">
   </a>
@@ -48,14 +51,14 @@
 poetry install
 ```
 
-### 3) 准备配置（本地配置不提交）
+### 3) 准备配置（密钥仅留在本地）
 
 本仓库默认读取 `config/default.yaml`（`knowledge_graph/utils/config.py`）。  
 推荐做法：
 
 - 复制示例：`config/default.example.yaml` → `config/default.yaml`
-- 在本地 `config/default.yaml` 填入你自己的 `api_key / api_base / model`
-- **不要提交 `config/`**（仓库已在 `.gitignore` 忽略 `config/`）
+- 在本地 `config/default.yaml` 填入你自己的 `api_key / api_base / model`（或通过环境变量占位，见示例文件注释）
+- 仓库**跟踪**无密钥的 `config/default.example.yaml`；**切勿提交**含真实密钥的 `config/default.yaml`（已由 `.gitignore` 排除）
 
 ### 4) 一键跑全流程
 
@@ -122,6 +125,7 @@ poetry run python -m knowledge_graph full --incremental
 - 细节级对齐代码：`docs/项目流程/11_全流程细节级实现说明.md`
 - 文档与代码对照：`docs/文档与代码对照表.md`
 - 本地开发指南：`docs/development.md`
+- 参与贡献：`CONTRIBUTING.md`
 
 ---
 
@@ -168,7 +172,7 @@ poetry run python -m knowledge_graph full --incremental
 
 ```text
 graph/
-├── config/                 # 本地配置（仓库默认忽略，不提交）
+├── config/                 # default.example.yaml 可跟踪；本地 default.yaml 勿提交密钥
 ├── data/
 │   ├── input/              # 输入（教材 csv、TOC 等）
 │   └── output/             # 输出（parquet、评测归档等，已忽略不提交）
@@ -216,7 +220,8 @@ Step 8: Neo4j 入库（知识点图，过滤 has_resource）
 
 ## 本次更新说明（你会感知到的变化）
 
-- **README 更可上手**：中文优先展示，提供中英切换入口
-- **新增示例配置**：`config/default.example.yaml`（不含密钥，逐项注释），本地复制为 `config/default.yaml` 使用
-- **文档全面对齐代码**：`docs/**` 中 6.5/7.5、评测产物路径、资源边界等与实际实现保持一致
+- **CLI 与文档对齐**：`python -m knowledge_graph full` 支持 `--incremental`；`python -m knowledge_graph.pipeline` 支持 `--full-refresh-l1`；移除未实现的 `--steps` 参数
+- **包入口**：新增 `knowledge_graph/__init__.py`，与 `poetry` 脚本 `kg-build` 对齐
+- **示例配置入库**：`config/default.example.yaml` 可被克隆后直接使用（本地 `default.yaml` 仍不提交）
+- **贡献指南**：见根目录 `CONTRIBUTING.md`
 

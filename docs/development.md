@@ -25,6 +25,7 @@ poetry install
 
 你需要关注的核心配置通常包括：
 
+- **模板文件**：仓库提供 `config/default.example.yaml`（无密钥）；本地复制为 `config/default.yaml` 再填写或改用环境变量占位。
 - **LLM**：`models.default_chat_model.api_key / api_base / model`（见 `knowledge_graph/utils/llm.py`）
 - **Neo4j**：`neo4j.uri / user / password / database`（见 `knowledge_graph/agents/graph_builder.py`）
 
@@ -66,6 +67,12 @@ poetry run python -m knowledge_graph full --incremental
 poetry run python -m knowledge_graph full --full-refresh-l1
 ```
 
+与 `full` 等价的全流程入口（不使用 `step` 子命令；参数与 `full` 的循环/增量开关一致）：
+
+```bash
+poetry run python -m knowledge_graph.pipeline --max-loops 3 --max-eval-loops 2 --incremental --full-refresh-l1
+```
+
 ### 4.3 单步执行（用于调试某一步）
 
 `step` 是位置参数（见 `knowledge_graph/__main__.py`），可取：
@@ -84,7 +91,7 @@ poetry run python -m knowledge_graph build
 
 ```
 graph/
-├── config/                 # 配置（default.yaml）
+├── config/                 # default.example.yaml（仓库）；本地 default.yaml（勿提交密钥）
 ├── data/
 │   ├── input/              # 输入（教材 csv、TOC 等）
 │   └── output/             # 输出（parquet、评测归档等）

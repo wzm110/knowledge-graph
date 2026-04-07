@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-04-07
+
+### Added
+- 仓库内提供 `config/default.example.yaml`（无密钥模板），`.gitignore` 对 `config/*` 白名单跟踪该文件。
+- `knowledge_graph/__init__.py` 导出 `main`，与 Poetry 脚本 `kg-build` 对齐。
+- 根目录 `CONTRIBUTING.md`；README 增加 CI 状态徽章。
+
+### Changed
+- `python -m knowledge_graph full` 增加 `--incremental`，与 `run_full_pipeline(incremental=...)` 一致。
+- `python -m knowledge_graph.pipeline` 增加 `--full-refresh-l1`，与 `skip_l1_if_exists` 行为对齐；移除未接线参数 `--steps`。
+
+### Fixed
+- 文档中关于增量模式、步骤 3 CLI 名称（`extract_l1_rels` vs 内部 `extract_prerequisites`）、双入口参数的描述与代码一致。
+
 ## [1.0.1] - 2026-04-01
 
 ### Changed

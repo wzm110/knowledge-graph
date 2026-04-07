@@ -52,5 +52,9 @@ logs/
 .env
 .env.local
 
-# Config with secrets
-config/
+# Local config (secrets). Tracked example is whitelisted.
+config/*
+!config/default.example.yaml
+
+# Obsidian / editor workspace under docs (not project docs)
+docs/.obsidian/

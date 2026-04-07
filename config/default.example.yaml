@@ -1,0 +1,27 @@
+# 复制本文件为 config/default.yaml 后填写真实密钥。
+# 支持环境变量：${VAR} 或 ${VAR:-默认值}（见 knowledge_graph/utils/config.py）
+
+pipeline:
+  subject: "深度学习"  # 学科/主题，写入提示词与评测上下文
+
+models:
+  default_chat_model:
+    model: "gpt-4o-mini"
+    api_key: "${OPENAI_API_KEY:-your-api-key}"
+    api_base: "${OPENAI_API_BASE:-https://api.openai.com/v1}"
+  default_embedding_model:
+    model: "text-embedding-3-small"
+    api_key: "${OPENAI_API_KEY:-your-api-key}"
+    api_base: "${OPENAI_API_BASE:-https://api.openai.com/v1}"
+    batch_size: 10
+
+neo4j:
+  uri: "neo4j://127.0.0.1:7687"
+  user: "neo4j"
+  password: "${NEO4J_PASSWORD:-12345678}"
+  database: "neo4j"
+
+# 以下为可选调参，缺省时代码内有默认值
+calibration: {}
+recluster: {}
+refinement: {}

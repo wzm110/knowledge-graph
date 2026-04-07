@@ -5,6 +5,9 @@
 Build a **course knowledge graph** from textbook chapters (CSV) and TOC files, then **evaluate**, **refine**, and optionally **import to Neo4j**.
 
 <div align="left">
+  <a href="https://github.com/wzm110/knowledge-graph/actions/workflows/ci.yml">
+    <img alt="CI" src="https://github.com/wzm110/knowledge-graph/actions/workflows/ci.yml/badge.svg">
+  </a>
   <a href="./LICENSE">
     <img alt="License" src="https://img.shields.io/badge/license-MIT-blue">
   </a>
@@ -49,12 +52,13 @@ What you get:
 poetry install
 ```
 
-### Configure (local config is not committed)
+### Configure (keep secrets local)
 
 The pipeline loads `config/default.yaml`. Recommended:
 
 - Copy `config/default.example.yaml` → `config/default.yaml`
-- Fill `api_key / api_base / model` in your local `config/default.yaml`
+- Fill `api_key / api_base / model` (or use env-var placeholders as documented in the example file)
+- The repo tracks `config/default.example.yaml` (no secrets). Do **not** commit real secrets in `config/default.yaml` (ignored by `.gitignore`)
 
 ### Run full pipeline
 
@@ -119,6 +123,7 @@ poetry run python -m knowledge_graph full --incremental
 - Implementation-level doc: `docs/项目流程/11_全流程细节级实现说明.md`
 - Doc↔code map: `docs/文档与代码对照表.md`
 - Development: `docs/development.md`
+- Contributing: `CONTRIBUTING.md`
 
 ---
 
@@ -154,7 +159,7 @@ poetry run python -m knowledge_graph full --incremental
 
 ```text
 graph/
-├── config/                 # local config (ignored, not committed)
+├── config/                 # default.example.yaml is tracked; local default.yaml must stay private
 ├── data/
 │   ├── input/              # inputs (chapter CSVs, TOC files, etc.)
 │   └── output/             # outputs (ignored)
@@ -202,7 +207,8 @@ Step 8: Neo4j import (KPs only, filters has_resource)
 
 ## What’s new in this update
 
-- **Better onboarding**: README now links to a real interactive demo (README preview + full GitHub Pages site)
-- **Safe example config**: added `config/default.example.yaml` (commented template, no secrets)
-- **Docs are aligned with code**: `docs/**` updated to match the current pipeline (6.5/7.5, evaluation artifacts, resource boundaries)
+- **CLI/docs parity**: `python -m knowledge_graph full` supports `--incremental`; `python -m knowledge_graph.pipeline` supports `--full-refresh-l1`; removed unused `--steps`
+- **Package entrypoint**: `knowledge_graph/__init__.py` aligns Poetry script `kg-build` with `main`
+- **Example config in-repo**: `config/default.example.yaml` ships with the clone; local `default.yaml` remains private
+- **Contributing guide**: see `CONTRIBUTING.md`
 

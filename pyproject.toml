@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "knowledge-graph"
-version = "0.1.0"
+version = "1.0.2"
 description = "面向教育场景的知识图谱构建系统，支持多教材并存、前置关系推理与学习路径规划"
 authors = ["wzm110 <your-email@example.com>"]
 license = "MIT"

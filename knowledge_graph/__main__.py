@@ -37,6 +37,8 @@ def main():
                        help='最大评估-微调循环次数 (默认: 5)')
     parser.add_argument('--full-refresh-l1', action='store_true',
                        help='全量重跑 L1 抽取与验证（即使已存在 stage1_entities.parquet 也不跳过）')
+    parser.add_argument('--incremental', action='store_true',
+                       help='增量模式：只处理新增输入文件（依赖 data/processed_files.json）')
     args = parser.parse_args()
 
     os.makedirs('data/output', exist_ok=True)
@@ -51,7 +53,8 @@ def main():
             max_loops=args.max_loops,
             max_eval_loops=args.max_eval_loops,
             test_mode=args.test,
-            skip_l1_if_exists=not args.full_refresh_l1
+            incremental=args.incremental,
+            skip_l1_if_exists=not args.full_refresh_l1,
         )
     elif args.step == 'extract_l1':
         from knowledge_graph.agents.l1_extractor import create_l1_extractor

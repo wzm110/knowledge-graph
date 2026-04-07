@@ -402,12 +402,12 @@ def main():
                        help='最大验证循环次数 (默认: 3)')
     parser.add_argument('--max-eval-loops', type=int, default=5,
                        help='最大评估-微调循环次数 (默认: 5)')
-    parser.add_argument('--steps', type=str, default='1-8',
-                       help='要运行的步骤 (如: 1-2, 3-8, 8)')
     parser.add_argument('--test', action='store_true',
                        help='测试模式：仅处理2个章节用于快速验证')
     parser.add_argument('--incremental', action='store_true',
                        help='增量模式：只处理新增文件，跳过已处理文件')
+    parser.add_argument('--full-refresh-l1', action='store_true',
+                       help='全量重跑 L1 抽取与验证（不跳过步骤1-2）')
     args = parser.parse_args()
     
     config = load_config()
@@ -419,7 +419,8 @@ def main():
         max_loops=args.max_loops,
         max_eval_loops=args.max_eval_loops,
         test_mode=args.test,
-        incremental=args.incremental
+        incremental=args.incremental,
+        skip_l1_if_exists=not args.full_refresh_l1,
     )
     
     logger.info("\n完成!")
